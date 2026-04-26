@@ -1,0 +1,10 @@
+node_modules/
+dist/
+
+*.log
+*.docx
+*.md
+!README.md
+
+.env
+.env.*
