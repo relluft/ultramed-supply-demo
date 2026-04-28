@@ -1,11 +1,11 @@
-import { UserRound, UsersRound } from 'lucide-react'
+import { BriefcaseBusiness, UserRound, UsersRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useDemo } from '../context'
 import { roleLabels } from '../lib/demoLogic'
 import { cn } from '../lib/format'
 import type { DemoRole } from '../types/demo'
 
-const roles: DemoRole[] = ['nurse-101', 'nurse-102', 'senior-nurse']
+const roles: DemoRole[] = ['nurse-101', 'nurse-102', 'senior-nurse', 'manager']
 
 export function RoleSwitcher({
   compact = false,
@@ -30,14 +30,14 @@ export function RoleSwitcher({
     }
 
     setRole(nextRole)
-    navigate(nextRole === 'senior-nurse' ? '/senior' : '/cabinet')
+    navigate(nextRole === 'senior-nurse' ? '/senior' : nextRole === 'manager' ? '/analytics' : '/cabinet')
   }
 
   return (
     <div className={cn('flex flex-wrap gap-1 rounded-md border border-slate-200 bg-slate-50 p-1', compact && 'max-w-full')}>
       {roles.map((item) => {
         const active = currentRole === item
-        const Icon = item === 'senior-nurse' ? UsersRound : UserRound
+        const Icon = item === 'senior-nurse' ? UsersRound : item === 'manager' ? BriefcaseBusiness : UserRound
 
         return (
           <button
@@ -50,7 +50,7 @@ export function RoleSwitcher({
             )}
           >
             <Icon size={15} />
-            {compact ? roleLabels[item].replace('Кабинет ', 'Каб. ') : roleLabels[item]}
+            {compact ? roleLabels[item].replace('Кабинет ', 'Каб. ').replace('Старшая медсестра', 'Старшая') : roleLabels[item]}
           </button>
         )
       })}

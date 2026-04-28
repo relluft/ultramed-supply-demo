@@ -1,5 +1,6 @@
-import { Minus, Plus, Search, Send, Star, Trash2, X } from 'lucide-react'
+import { ClipboardList, Home, Minus, Plus, Search, Send, Star, Trash2, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { PageTransition } from '../components/PageTransition'
 import { Button, EmptyState, Panel, SectionHeader, StatusPill, fieldStyles } from '../components/ui'
 import { useDemo } from '../context'
@@ -188,6 +189,7 @@ function RequestCart({
 }
 
 export function NurseCabinetPage() {
+  const location = useLocation()
   const {
     state: { role, rooms, catalog, requests, carts },
     addCatalogToCart,
@@ -224,6 +226,65 @@ export function NurseCabinetPage() {
       })
   }, [catalog, category, query, quickFilter])
   const myRequests = requests.filter((request) => request.roomId === roomId)
+
+  if (!location.hash) {
+    const dashboardItems = [
+      {
+        to: '/cabinet#request',
+        title: 'Заявка',
+        caption: 'Найти материалы и отправить новую заявку',
+        meta: cart.length ? `${cart.length} строк в корзине` : 'Корзина пуста',
+        icon: Home,
+      },
+      {
+        to: '/cabinet#my-requests',
+        title: 'История заявок',
+        caption: 'Посмотреть отправленные заявки и статусы',
+        meta: `${myRequests.length} заявок кабинета`,
+        icon: ClipboardList,
+      },
+    ]
+
+    return (
+      <PageTransition className="grid gap-3">
+        <Panel>
+          <SectionHeader
+            title={`Кабинет ${room?.number ?? ''}`}
+            subtitle={`${room?.title ?? ''} · ${room?.type ?? ''} · демо-пользователь ${room?.nurseName ?? ''}`}
+            action={<StatusPill tone="success">Автоматически привязан к кабинету</StatusPill>}
+          />
+        </Panel>
+
+        <section className="grid min-h-[360px] content-start gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-950">Выберите, с чего начать</h2>
+            <p className="mt-1 text-sm text-slate-500">Главная кабинета</p>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {dashboardItems.map((item) => {
+              const Icon = item.icon
+
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className="group min-h-[150px] rounded-lg border border-slate-200 bg-slate-50/60 p-4 transition hover:border-emerald-200 hover:bg-emerald-50/60 hover:shadow-sm"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-white text-emerald-800 transition group-hover:border-emerald-200">
+                    <Icon size={20} />
+                  </div>
+                  <div className="mt-4 text-lg font-semibold text-slate-950">{item.title}</div>
+                  <div className="mt-1 text-sm leading-5 text-slate-500">{item.caption}</div>
+                  <div className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">{item.meta}</div>
+                </Link>
+              )
+            })}
+          </div>
+        </section>
+      </PageTransition>
+    )
+  }
 
   return (
     <PageTransition className="grid gap-3 xl:grid-cols-[minmax(0,1fr),360px]">

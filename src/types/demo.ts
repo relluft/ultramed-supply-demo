@@ -1,4 +1,4 @@
-export type DemoRole = 'nurse-101' | 'nurse-102' | 'senior-nurse'
+export type DemoRole = 'nurse-101' | 'nurse-102' | 'senior-nurse' | 'manager'
 
 export interface Room {
   id: string
@@ -103,6 +103,7 @@ export interface SupplyRequest {
   createdAt: string
   status: RequestStatus
   lines: SupplyRequestLine[]
+  title?: string
   comment?: string
 }
 

@@ -12,7 +12,7 @@ export function SuppliersPage() {
   return (
     <PageTransition className="grid gap-3">
       <Panel>
-        <SectionHeader title="Поставщики" subtitle="Три разрешенных поставщика в demo-контуре UltraMed Supply." />
+        <SectionHeader title="Поставщики" subtitle="Три разрешенных поставщика в demo-контуре УльтраМед Снабжение." />
       </Panel>
 
       <div className="grid gap-3 xl:grid-cols-3">

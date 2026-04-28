@@ -1,6 +1,6 @@
-# UltraMed Supply
+# УльтраМед Снабжение
 
-Frontend MVP demo for the UltraMed Supply dental clinic supply workflow.
+Frontend MVP demo for the УльтраМед Снабжение dental clinic supply workflow.
 
 The demo uses React, TypeScript, Vite, Tailwind CSS, `react-router-dom`, `lucide-react`, and client-side mock state in `localStorage`. There is no backend, database, real authorization, email sending, or supplier integration.
 

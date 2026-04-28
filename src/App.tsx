@@ -20,7 +20,7 @@ function RequireSenior({ children }: { children: ReactNode }) {
     state: { role },
   } = useDemo()
 
-  return role === 'senior-nurse' ? children : <Navigate to="/cabinet" replace />
+  return role === 'senior-nurse' || role === 'manager' ? children : <Navigate to="/cabinet" replace />
 }
 
 function RequireNurse({ children }: { children: ReactNode }) {
@@ -28,7 +28,10 @@ function RequireNurse({ children }: { children: ReactNode }) {
     state: { role },
   } = useDemo()
 
-  return role === 'senior-nurse' ? <Navigate to="/senior" replace /> : children
+  if (role === 'senior-nurse') return <Navigate to="/senior" replace />
+  if (role === 'manager') return <Navigate to="/analytics" replace />
+
+  return children
 }
 
 function AnimatedRoutes() {

@@ -3,117 +3,184 @@ import {
   BookOpen,
   ClipboardList,
   Home,
-  Inbox,
   PackageCheck,
   PackageSearch,
   Receipt,
   ShoppingCart,
   Truck,
-  Users,
 } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useDemo } from '../context'
-import { roleToRoomId } from '../lib/demoLogic'
 import { cn } from '../lib/format'
 
-const seniorNav = [
-  { to: '/senior', label: 'Рабочий стол', icon: Inbox },
-  { to: '/stock', label: 'Склад', icon: PackageSearch },
-  { to: '/replenishment', label: 'Пополнение', icon: PackageCheck },
-  { to: '/orders', label: 'Заказы', icon: ShoppingCart },
-  { to: '/receipt', label: 'Приход', icon: Receipt },
-  { to: '/suppliers', label: 'Поставщики', icon: Truck },
-  { to: '/catalog', label: 'Справочник', icon: BookOpen },
-  { to: '/journal', label: 'Журнал', icon: ClipboardList },
-  { to: '/analytics', label: 'Аналитика', icon: BarChart3 },
+type SidebarItem = {
+  to: string
+  label: string
+  icon: typeof BarChart3
+  disabled?: boolean
+}
+
+type SidebarGroup = {
+  title: string
+  icon: typeof BarChart3
+  items: SidebarItem[]
+}
+
+const seniorGroups: SidebarGroup[] = [
+  {
+    title: 'Главная',
+    icon: Home,
+    items: [
+      { to: '/senior', label: 'Главная', icon: Home },
+    ],
+  },
+  {
+    title: 'Отчеты',
+    icon: BarChart3,
+    items: [
+      { to: '/stock', label: 'Остатки', icon: PackageSearch },
+      { to: '/journal#turnover', label: 'Оборот', icon: ClipboardList },
+      { to: '/analytics#stock', label: 'Анализ остатков', icon: BarChart3, disabled: true },
+      { to: '/analytics#inventory', label: 'Анализ инвентаризации', icon: BarChart3, disabled: true },
+    ],
+  },
+  {
+    title: 'Накладные',
+    icon: ClipboardList,
+    items: [
+      { to: '/senior#requests', label: 'Заявки', icon: ClipboardList },
+      { to: '/orders', label: 'Закупка', icon: ShoppingCart },
+      { to: '/senior#issue', label: 'Выдача', icon: PackageCheck, disabled: true },
+      { to: '/journal#writeoff', label: 'Списание', icon: ClipboardList, disabled: true },
+      { to: '/stock#inventory', label: 'Инвентаризация', icon: PackageSearch, disabled: true },
+      { to: '/receipt', label: 'Приход', icon: Receipt, disabled: true },
+      { to: '/journal#sales', label: 'Продажа', icon: Receipt, disabled: true },
+      { to: '/suppliers#settlements', label: 'Расчеты с поставщиками', icon: Truck, disabled: true },
+    ],
+  },
+  {
+    title: 'Справочники',
+    icon: BookOpen,
+    items: [
+      { to: '/catalog', label: 'Материалы', icon: BookOpen },
+      { to: '/suppliers', label: 'Поставщики', icon: Truck },
+    ],
+  },
+  {
+    title: 'Аналитика',
+    icon: BarChart3,
+    items: [
+      { to: '/analytics', label: 'Аналитические отчеты', icon: BarChart3 },
+    ],
+  },
 ]
 
-const nurseNav = [
-  { to: '/cabinet', label: 'Кабинет', icon: Home },
-  { to: '/cabinet#my-requests', label: 'Мои заявки', icon: ClipboardList },
+const nurseGroups: SidebarGroup[] = [
+  {
+    title: 'Кабинет',
+    icon: Home,
+    items: [
+      { to: '/cabinet', label: 'Главная', icon: Home },
+      { to: '/cabinet#request', label: 'Заявка', icon: Home },
+      { to: '/cabinet#my-requests', label: 'История заявок', icon: ClipboardList },
+    ],
+  },
 ]
+
+const managerGroups: SidebarGroup[] = [
+  {
+    title: 'Контроль',
+    icon: BarChart3,
+    items: [
+      { to: '/analytics', label: 'Аналитические отчеты', icon: BarChart3 },
+      { to: '/journal', label: 'Журнал', icon: ClipboardList },
+      { to: '/stock', label: 'Остатки', icon: PackageSearch },
+      { to: '/suppliers', label: 'Поставщики', icon: Truck },
+    ],
+  },
+]
+
+function isItemActive(to: string, pathname: string, hash: string) {
+  const current = `${pathname}${hash}`
+
+  if (to.includes('#')) {
+    return current === to
+  }
+
+  return pathname === to && !hash
+}
 
 export function WorkspaceSidebar() {
   const {
-    state: { role, rooms, requests, replenishment, orders },
+    state: { role },
   } = useDemo()
-  const roomId = roleToRoomId(role)
-  const room = rooms.find((item) => item.id === roomId)
-  const nav = role === 'senior-nurse' ? seniorNav : nurseNav
-  const activeReplenishment = replenishment.filter((line) => !line.closedAt).length
-  const waitingReceipt = orders.filter((order) => order.status === 'waiting-receipt').length
+  const location = useLocation()
+  const groups = role === 'manager' ? managerGroups : role === 'senior-nurse' ? seniorGroups : nurseGroups
 
   return (
-    <aside className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)] lg:w-[252px] lg:shrink-0">
-      <div className="flex items-center gap-3 rounded-md bg-slate-50 p-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-white font-semibold text-emerald-800">
-          UM
-        </div>
-        <div>
-          <div className="font-semibold text-slate-950">UltraMed</div>
-          <div className="text-xs text-slate-500">Контур снабжения</div>
+    <aside className="rounded-lg border border-slate-200 bg-white p-2 shadow-sm lg:sticky lg:top-2 lg:h-[calc(100vh-1rem)] lg:w-[218px] lg:shrink-0">
+      <div className="flex h-16 flex-col items-center justify-center rounded-md px-2.5">
+        <img
+          src="/brand/ultramed-main-logo.svg"
+          alt="УльтраМед"
+          className="h-auto w-[156px] max-w-full object-contain object-center"
+        />
+        <div className="mt-0.5 text-center text-[12px] font-normal leading-none text-[#6089bb]">
+          СНАБЖЕНИЕ
         </div>
       </div>
 
-      <nav className="mt-3 grid gap-1">
-        {nav.map((item) => {
-          const Icon = item.icon
+      <nav className="mt-3 grid gap-3 overflow-y-auto pr-0.5">
+        {groups.map((group) => {
+          const GroupIcon = group.icon
 
           return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                cn(
-                  'flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition',
-                  isActive
-                    ? 'bg-emerald-700 text-white'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950',
-                )
-              }
-            >
-              <Icon size={17} />
-              {item.label}
-            </NavLink>
+            <section key={group.title}>
+              <div className="mb-1.5 flex items-center gap-2 px-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                <GroupIcon size={13} />
+                {group.title}
+              </div>
+              <div className="relative grid gap-0.5 pl-2">
+                <div className="absolute bottom-2 left-[13px] top-1 w-px bg-slate-200" />
+                {group.items.map((item) => {
+                  const Icon = item.icon
+                  const active = isItemActive(item.to, location.pathname, location.hash)
+                  const className = cn(
+                    'relative flex min-h-7 items-center gap-2 rounded-md py-1 pl-4 pr-2 text-[13px] font-semibold leading-4 transition',
+                    item.disabled
+                      ? 'cursor-not-allowed text-slate-400 opacity-55'
+                      : active
+                        ? 'bg-emerald-700 text-white shadow-sm'
+                        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950',
+                  )
+                  const content = (
+                    <>
+                      <span
+                        className={cn(
+                          'absolute left-[3px] top-1/2 h-px w-3 -translate-y-1/2',
+                          active && !item.disabled ? 'bg-emerald-700' : 'bg-slate-200',
+                        )}
+                      />
+                      <Icon size={15} className="shrink-0" />
+                      <span className="min-w-0">{item.label}</span>
+                    </>
+                  )
+
+                  return item.disabled ? (
+                    <span key={item.to} aria-disabled="true" className={className}>
+                      {content}
+                    </span>
+                  ) : (
+                    <Link key={item.to} to={item.to} className={className}>
+                      {content}
+                    </Link>
+                  )
+                })}
+              </div>
+            </section>
           )
         })}
       </nav>
-
-      <div className="mt-4 grid gap-2 border-t border-slate-100 pt-4 text-sm">
-        {room ? (
-          <div className="rounded-md border border-slate-200 p-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Привязка</div>
-            <div className="mt-1 font-semibold text-slate-950">Кабинет {room.number}</div>
-            <div className="text-slate-500">{room.nurseName}, {room.title}</div>
-          </div>
-        ) : (
-          <div className="rounded-md border border-slate-200 p-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Рабочий режим</div>
-            <div className="mt-1 font-semibold text-slate-950">Старшая медсестра</div>
-            <div className="text-slate-500">Полный контур демо</div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-md bg-slate-50 p-3">
-            <div className="text-xs text-slate-500">Заявки</div>
-            <div className="text-lg font-semibold text-slate-950">{requests.length}</div>
-          </div>
-          <div className="rounded-md bg-slate-50 p-3">
-            <div className="text-xs text-slate-500">{role === 'senior-nurse' ? 'Пополнение' : 'Мои'}</div>
-            <div className="text-lg font-semibold text-slate-950">
-              {role === 'senior-nurse' ? activeReplenishment : requests.filter((request) => request.roomId === roomId).length}
-            </div>
-          </div>
-        </div>
-
-        {role === 'senior-nurse' ? (
-          <div className="rounded-md bg-amber-50 p-3 text-amber-900">
-            <div className="text-xs font-semibold uppercase tracking-wide">Ожидают прихода</div>
-            <div className="mt-1 text-lg font-semibold">{waitingReceipt}</div>
-          </div>
-        ) : null}
-      </div>
     </aside>
   )
 }

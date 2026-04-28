@@ -30,7 +30,7 @@ import type {
   SupplyRequest,
 } from './types/demo'
 
-const storageKey = 'ultramed-supply-demo-state-v12'
+const storageKey = 'ultramed-supply-demo-state-v15'
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
@@ -69,6 +69,68 @@ function createInitialState(role: DemoRole = 'nurse-101', demoStarted = false): 
   }
 }
 
+function mergeById<T extends { id: string }>(storedItems: T[] | undefined, mockItems: T[]) {
+  const storedById = new Map((storedItems ?? []).map((item) => [item.id, item]))
+  const mockIds = new Set(mockItems.map((item) => item.id))
+
+  return [
+    ...mockItems.map((mockItem) => ({ ...storedById.get(mockItem.id), ...mockItem })),
+    ...(storedItems ?? []).filter((item) => !mockIds.has(item.id)),
+  ]
+}
+
+function mergeStock(storedItems: DemoState['stock'] | undefined) {
+  const storedByItemId = new Map((storedItems ?? []).map((item) => [item.itemId, item]))
+  const mockItemIds = new Set(mockStock.map((item) => item.itemId))
+
+  return [
+    ...mockStock.map((mockItem) => storedByItemId.get(mockItem.itemId) ?? mockItem),
+    ...(storedItems ?? []).filter((item) => !mockItemIds.has(item.itemId)),
+  ]
+}
+
+function mergeRequestLines(storedLines: SupplyRequest['lines'] | undefined, mockLines: SupplyRequest['lines']) {
+  const storedById = new Map((storedLines ?? []).map((line) => [line.id, line]))
+  const mockIds = new Set(mockLines.map((line) => line.id))
+
+  return [
+    ...mockLines.map((mockLine) => ({ ...mockLine, ...storedById.get(mockLine.id) })),
+    ...(storedLines ?? []).filter((line) => !mockIds.has(line.id)),
+  ]
+}
+
+function hydrateState(storedState: Partial<DemoState>) {
+  const initialState = createInitialState()
+  const nextState = { ...initialState, ...storedState } as DemoState
+
+  nextState.rooms = mergeById(nextState.rooms, mockRooms)
+  nextState.suppliers = mergeById(nextState.suppliers, mockSuppliers)
+  nextState.catalog = mergeById(nextState.catalog, mockCatalog)
+  nextState.stock = mergeStock(nextState.stock)
+
+  nextState.requests = (nextState.requests ?? []).map((request) => {
+    const mockRequest = mockRequests.find((item) => item.id === request.id)
+
+    if (mockRequest) {
+      return {
+        ...request,
+        title: mockRequest.title,
+        comment: mockRequest.comment,
+        createdBy: mockRequest.createdBy,
+        lines: mergeRequestLines(request.lines, mockRequest.lines),
+      }
+    }
+
+    const normalizedTitle = request.title?.replace(/_/g, ' ')
+    return {
+      ...request,
+      title: normalizedTitle,
+    }
+  })
+
+  return nextState
+}
+
 function loadState() {
   if (typeof window === 'undefined') {
     return createInitialState()
@@ -80,7 +142,7 @@ function loadState() {
   }
 
   try {
-    return { ...createInitialState(), ...JSON.parse(stored) } as DemoState
+    return hydrateState(JSON.parse(stored) as Partial<DemoState>)
   } catch {
     return createInitialState()
   }
@@ -226,6 +288,13 @@ const DemoContext = createContext<DemoContextValue | null>(null)
 
 export function DemoProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<DemoState>(loadState)
+
+  useEffect(() => {
+    setState((current) => {
+      const hydrated = hydrateState(current)
+      return JSON.stringify(hydrated) === JSON.stringify(current) ? current : hydrated
+    })
+  }, [])
 
   useEffect(() => {
     window.localStorage.setItem(storageKey, JSON.stringify(state))
