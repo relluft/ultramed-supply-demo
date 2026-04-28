@@ -1,15 +1,16 @@
-import type { ButtonHTMLAttributes, HTMLAttributes, PropsWithChildren } from 'react'
+import type { ButtonHTMLAttributes, HTMLAttributes, PropsWithChildren, ReactNode } from 'react'
 import { cn } from '../lib/format'
 
-export function buttonStyles(variant: 'primary' | 'secondary' | 'ghost' = 'primary') {
+export function buttonStyles(
+  variant: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success' = 'primary',
+) {
   return cn(
-    'inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10 disabled:pointer-events-none disabled:opacity-50',
-    variant === 'primary' &&
-      'border border-neutral-900 bg-white text-neutral-950 shadow-sm hover:-translate-y-0.5 hover:bg-neutral-50',
-    variant === 'secondary' &&
-      'border border-neutral-200 bg-white text-neutral-950 hover:-translate-y-0.5 hover:border-neutral-300',
-    variant === 'ghost' &&
-      'border border-transparent bg-transparent text-neutral-500 hover:bg-white hover:text-neutral-950',
+    'inline-flex min-h-9 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/20 disabled:pointer-events-none disabled:opacity-45',
+    variant === 'primary' && 'border border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800',
+    variant === 'secondary' && 'border border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50',
+    variant === 'ghost' && 'border border-transparent bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-950',
+    variant === 'danger' && 'border border-rose-600 bg-rose-600 text-white hover:bg-rose-700',
+    variant === 'success' && 'border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100',
   )
 }
 
@@ -19,45 +20,57 @@ export function Button({
   type = 'button',
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'primary' | 'secondary' | 'ghost'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success'
 }) {
   return <button type={type} className={cn(buttonStyles(variant), className)} {...props} />
 }
 
 export function Panel({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn('panel rounded-[28px] border border-neutral-200 bg-white p-5 shadow-sm', className)}
-      {...props}
-    />
-  )
+  return <div className={cn('rounded-lg border border-slate-200 bg-white p-4 shadow-sm', className)} {...props} />
 }
 
-export function Eyebrow({ children }: PropsWithChildren) {
+export function SectionHeader({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string
+  subtitle?: string
+  action?: ReactNode
+}) {
   return (
-    <span className="inline-flex rounded-full border border-neutral-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-neutral-500">
-      {children}
-    </span>
+    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+      <div>
+        <h1 className="text-2xl font-semibold text-slate-950">{title}</h1>
+        {subtitle ? <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{subtitle}</p> : null}
+      </div>
+      {action ? <div className="flex shrink-0 flex-wrap gap-2">{action}</div> : null}
+    </div>
   )
 }
 
 export function StatusPill({
   children,
   tone = 'neutral',
-}: PropsWithChildren<{ tone?: 'neutral' | 'ready' | 'warning' | 'danger' | 'progress' }>) {
+  className,
+}: PropsWithChildren<{
+  tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'info'
+  className?: string
+}>) {
   const classes = {
-    neutral: 'border-neutral-200 bg-white text-neutral-700',
-    ready: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    neutral: 'border-slate-200 bg-slate-50 text-slate-700',
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-800',
     warning: 'border-amber-200 bg-amber-50 text-amber-800',
     danger: 'border-rose-200 bg-rose-50 text-rose-800',
-    progress: 'border-neutral-900 bg-neutral-900 text-white',
+    info: 'border-sky-200 bg-sky-50 text-sky-800',
   }[tone]
 
   return (
     <span
       className={cn(
-        'inline-flex items-center justify-center rounded-full border px-2.5 py-1 text-[11px] font-semibold',
+        'inline-flex min-h-6 items-center justify-center rounded-md border px-2 py-0.5 text-xs font-semibold',
         classes,
+        className,
       )}
     >
       {children}
@@ -65,16 +78,18 @@ export function StatusPill({
   )
 }
 
-export function ProgressBar({ value }: { value: number }) {
+export function EmptyState({ children, className }: PropsWithChildren<{ className?: string }>) {
   return (
-    <div className="h-2 overflow-hidden rounded-full border border-neutral-200 bg-neutral-100">
-      <div
-        className="h-full rounded-full bg-neutral-950 transition-[width] duration-200"
-        style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
-      />
+    <div className={cn('rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500', className)}>
+      {children}
     </div>
   )
 }
 
 export const fieldStyles =
-  'w-full rounded-[18px] border border-neutral-200 bg-white px-4 py-3 text-sm leading-6 text-neutral-950 outline-none transition hover:border-neutral-300 focus:border-neutral-900 focus:ring-4 focus:ring-neutral-900/5'
+  'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10'
+
+export const tableHeaderCell =
+  'border-b border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500'
+
+export const tableCell = 'border-b border-slate-100 px-3 py-2 align-top text-sm text-slate-700'

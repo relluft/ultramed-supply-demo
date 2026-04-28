@@ -1,20 +1,21 @@
-# UltraMed Supply Demo
+# UltraMed Supply
+
+Frontend MVP demo for the UltraMed Supply dental clinic supply workflow.
+
+The demo uses React, TypeScript, Vite, Tailwind CSS, `react-router-dom`, `lucide-react`, and client-side mock state in `localStorage`. There is no backend, database, real authorization, email sending, or supplier integration.
 
 ## Launch
 
-Install dependencies:
-
 ```bash
 npm install
-```
-
-Start the development server:
-
-```bash
 npm run dev
 ```
 
-Open the local URL shown in the terminal. By default the app runs through Vite on `127.0.0.1`.
+Default local URL:
+
+```text
+http://127.0.0.1:5173/
+```
 
 ## Build
 
@@ -22,8 +23,9 @@ Open the local URL shown in the terminal. By default the app runs through Vite o
 npm run build
 ```
 
-Preview the production build:
+## Main Demo Flow
 
-```bash
-npm run preview
-```
+1. Start the demo and select `Кабинет 101`.
+2. Add `Перчатки нитриловые M`, `Композит A2`, and a manual line through `Позиция не найдена`.
+3. Switch to `Старшая медсестра`.
+4. Issue stock, create replenishment, confirm supplier availability, form orders, accept receipt, and review the journal.

@@ -1,13 +1,35 @@
 import { AnimatePresence } from 'framer-motion'
+import type { ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppLayout } from './components/AppLayout'
-import { DemoProvider } from './context'
-import { DashboardPage } from './pages/DashboardPage'
-import { DocumentsPage } from './pages/DocumentsPage'
-import { LandingPage } from './pages/LandingPage'
-import { ManagerPage } from './pages/ManagerPage'
-import { NeedPage } from './pages/NeedPage'
-import { TablePage } from './pages/TablePage'
+import { DemoProvider, useDemo } from './context'
+import { AnalyticsPage } from './pages/AnalyticsPage'
+import { CatalogPage } from './pages/CatalogPage'
+import { JournalPage } from './pages/JournalPage'
+import { NurseCabinetPage } from './pages/NurseCabinetPage'
+import { ReceiptPage } from './pages/ReceiptPage'
+import { ReplenishmentPage } from './pages/ReplenishmentPage'
+import { SeniorWorkspacePage } from './pages/SeniorWorkspacePage'
+import { StartPage } from './pages/StartPage'
+import { StockPage } from './pages/StockPage'
+import { SupplierOrdersPage } from './pages/SupplierOrdersPage'
+import { SuppliersPage } from './pages/SuppliersPage'
+
+function RequireSenior({ children }: { children: ReactNode }) {
+  const {
+    state: { role },
+  } = useDemo()
+
+  return role === 'senior-nurse' ? children : <Navigate to="/cabinet" replace />
+}
+
+function RequireNurse({ children }: { children: ReactNode }) {
+  const {
+    state: { role },
+  } = useDemo()
+
+  return role === 'senior-nurse' ? <Navigate to="/senior" replace /> : children
+}
 
 function AnimatedRoutes() {
   const location = useLocation()
@@ -15,23 +37,89 @@ function AnimatedRoutes() {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        <Route index element={<LandingPage />} />
-        <Route path="/manager" element={<ManagerPage />} />
+        <Route index element={<StartPage />} />
 
-        <Route path="/workspace" element={<AppLayout current="workspace" />}>
-          <Route index element={<DashboardPage />} />
-        </Route>
-
-        <Route path="/workspace/purchase/cases/main/need" element={<AppLayout current="need" />}>
-          <Route index element={<NeedPage />} />
-        </Route>
-
-        <Route path="/workspace/purchase/drafts/main" element={<AppLayout current="table" />}>
-          <Route index element={<TablePage />} />
-        </Route>
-
-        <Route path="/workspace/purchase/documents/main" element={<AppLayout current="documents" />}>
-          <Route index element={<DocumentsPage />} />
+        <Route element={<AppLayout />}>
+          <Route
+            path="/cabinet"
+            element={
+              <RequireNurse>
+                <NurseCabinetPage />
+              </RequireNurse>
+            }
+          />
+          <Route
+            path="/senior"
+            element={
+              <RequireSenior>
+                <SeniorWorkspacePage />
+              </RequireSenior>
+            }
+          />
+          <Route
+            path="/stock"
+            element={
+              <RequireSenior>
+                <StockPage />
+              </RequireSenior>
+            }
+          />
+          <Route
+            path="/replenishment"
+            element={
+              <RequireSenior>
+                <ReplenishmentPage />
+              </RequireSenior>
+            }
+          />
+          <Route
+            path="/orders"
+            element={
+              <RequireSenior>
+                <SupplierOrdersPage />
+              </RequireSenior>
+            }
+          />
+          <Route
+            path="/receipt"
+            element={
+              <RequireSenior>
+                <ReceiptPage />
+              </RequireSenior>
+            }
+          />
+          <Route
+            path="/suppliers"
+            element={
+              <RequireSenior>
+                <SuppliersPage />
+              </RequireSenior>
+            }
+          />
+          <Route
+            path="/catalog"
+            element={
+              <RequireSenior>
+                <CatalogPage />
+              </RequireSenior>
+            }
+          />
+          <Route
+            path="/journal"
+            element={
+              <RequireSenior>
+                <JournalPage />
+              </RequireSenior>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <RequireSenior>
+                <AnalyticsPage />
+              </RequireSenior>
+            }
+          />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

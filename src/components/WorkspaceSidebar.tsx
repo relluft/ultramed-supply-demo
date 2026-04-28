@@ -1,106 +1,118 @@
-import { CircleHelp, FolderHeart, RotateCcw, Settings2 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import {
+  BarChart3,
+  BookOpen,
+  ClipboardList,
+  Home,
+  Inbox,
+  PackageCheck,
+  PackageSearch,
+  Receipt,
+  ShoppingCart,
+  Truck,
+  Users,
+} from 'lucide-react'
+import { NavLink } from 'react-router-dom'
 import { useDemo } from '../context'
-import { formatNumber } from '../lib/format'
-import { Button } from './ui'
+import { roleToRoomId } from '../lib/demoLogic'
+import { cn } from '../lib/format'
 
-function formatTime(value: string) {
-  return new Intl.DateTimeFormat('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
-}
+const seniorNav = [
+  { to: '/senior', label: 'Рабочий стол', icon: Inbox },
+  { to: '/stock', label: 'Склад', icon: PackageSearch },
+  { to: '/replenishment', label: 'Пополнение', icon: PackageCheck },
+  { to: '/orders', label: 'Заказы', icon: ShoppingCart },
+  { to: '/receipt', label: 'Приход', icon: Receipt },
+  { to: '/suppliers', label: 'Поставщики', icon: Truck },
+  { to: '/catalog', label: 'Справочник', icon: BookOpen },
+  { to: '/journal', label: 'Журнал', icon: ClipboardList },
+  { to: '/analytics', label: 'Аналитика', icon: BarChart3 },
+]
+
+const nurseNav = [
+  { to: '/cabinet', label: 'Кабинет', icon: Home },
+  { to: '/cabinet#my-requests', label: 'Мои заявки', icon: ClipboardList },
+]
 
 export function WorkspaceSidebar() {
   const {
-    state: { recentCycles, rows },
-    resetDemo,
+    state: { role, rooms, requests, replenishment, orders },
   } = useDemo()
+  const roomId = roleToRoomId(role)
+  const room = rooms.find((item) => item.id === roomId)
+  const nav = role === 'senior-nurse' ? seniorNav : nurseNav
+  const activeReplenishment = replenishment.filter((line) => !line.closedAt).length
+  const waitingReceipt = orders.filter((order) => order.status === 'waiting-receipt').length
 
   return (
-    <aside className="sticky top-5 flex h-[calc(100vh-2.5rem)] w-full flex-col overflow-hidden rounded-[30px] border border-neutral-200 bg-white/86 p-5 shadow-sm backdrop-blur">
-      <Link to="/" className="rounded-[24px] border border-neutral-200 bg-white p-4 transition hover:bg-neutral-50">
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full border border-neutral-200 bg-white text-lg font-semibold text-neutral-950">
-            А
-          </div>
-          <div>
-            <div className="text-lg font-semibold text-neutral-950">Администратор</div>
-            <div className="mt-1 text-sm text-neutral-500">Рабочая область</div>
-          </div>
+    <aside className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)] lg:w-[252px] lg:shrink-0">
+      <div className="flex items-center gap-3 rounded-md bg-slate-50 p-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-white font-semibold text-emerald-800">
+          UM
         </div>
-      </Link>
+        <div>
+          <div className="font-semibold text-slate-950">UltraMed</div>
+          <div className="text-xs text-slate-500">Контур снабжения</div>
+        </div>
+      </div>
 
-      <div className="mt-5 space-y-2">
-        {[
-          { to: '/workspace', icon: FolderHeart, label: 'Рабочая область' },
-          { icon: Settings2, label: 'Настройки' },
-          { icon: CircleHelp, label: 'Помощь' },
-        ].map((item) => {
+      <nav className="mt-3 grid gap-1">
+        {nav.map((item) => {
           const Icon = item.icon
-          const content = (
-            <>
-              <Icon size={16} />
-              {item.label}
-            </>
-          )
-          const className =
-            'inline-flex w-full items-center justify-center gap-2 rounded-full border border-neutral-200 bg-white px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:-translate-y-0.5 hover:bg-neutral-50'
 
-          return item.to ? (
-            <Link key={item.label} to={item.to} className={className}>
-              {content}
-            </Link>
-          ) : (
-            <button key={item.label} className={className}>
-              {content}
-            </button>
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                cn(
+                  'flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition',
+                  isActive
+                    ? 'bg-emerald-700 text-white'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950',
+                )
+              }
+            >
+              <Icon size={17} />
+              {item.label}
+            </NavLink>
           )
         })}
-        <Button className="w-full" variant="secondary" onClick={resetDemo}>
-          <RotateCcw size={16} />
-          Сброс
-        </Button>
-      </div>
+      </nav>
 
-      <div className="mt-6">
-        <div className="flex items-center justify-between px-1">
-          <div className="text-sm font-semibold text-neutral-950">Последние циклы</div>
-          <div className="text-xs text-neutral-500">{formatNumber(recentCycles.length)} активных</div>
-        </div>
-        <div className="mt-3 space-y-2.5">
-          {recentCycles.length ? (
-            recentCycles.map((cycle) => (
-              <Link
-                key={cycle.id}
-                to="/workspace/purchase/cases/main/need"
-                className="block rounded-[22px] border border-neutral-200 bg-white px-4 py-4 transition hover:bg-neutral-50"
-              >
-                <div className="text-sm font-semibold text-neutral-950">{cycle.title}</div>
-                <div className="mt-2 text-sm leading-6 text-neutral-500">{cycle.subtitle}</div>
-                <div className="mt-3 text-xs text-neutral-400">{formatTime(cycle.createdAt)}</div>
-              </Link>
-            ))
-          ) : (
-            <div className="rounded-[22px] border border-dashed border-neutral-300 p-4 text-sm text-neutral-500">
-              Пока пусто.
+      <div className="mt-4 grid gap-2 border-t border-slate-100 pt-4 text-sm">
+        {room ? (
+          <div className="rounded-md border border-slate-200 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Привязка</div>
+            <div className="mt-1 font-semibold text-slate-950">Кабинет {room.number}</div>
+            <div className="text-slate-500">{room.nurseName}, {room.title}</div>
+          </div>
+        ) : (
+          <div className="rounded-md border border-slate-200 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Рабочий режим</div>
+            <div className="mt-1 font-semibold text-slate-950">Старшая медсестра</div>
+            <div className="text-slate-500">Полный контур демо</div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">Заявки</div>
+            <div className="text-lg font-semibold text-slate-950">{requests.length}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">{role === 'senior-nurse' ? 'Пополнение' : 'Мои'}</div>
+            <div className="text-lg font-semibold text-slate-950">
+              {role === 'senior-nurse' ? activeReplenishment : requests.filter((request) => request.roomId === roomId).length}
             </div>
-          )}
+          </div>
         </div>
-      </div>
 
-      <div className="mt-6 flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center justify-between px-1">
-          <div className="text-sm font-semibold text-neutral-950">История</div>
-          <div className="text-xs text-neutral-500">{rows.length} строк</div>
-        </div>
-        <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-[22px] border border-neutral-200 bg-neutral-50 p-4 text-sm leading-6 text-neutral-500">
-          {rows.length
-            ? 'Демо-цикл загружен. Таблица готова к проверке и формированию документов.'
-            : 'События появятся после создания закупочного цикла.'}
-        </div>
+        {role === 'senior-nurse' ? (
+          <div className="rounded-md bg-amber-50 p-3 text-amber-900">
+            <div className="text-xs font-semibold uppercase tracking-wide">Ожидают прихода</div>
+            <div className="mt-1 text-lg font-semibold">{waitingReceipt}</div>
+          </div>
+        ) : null}
       </div>
     </aside>
   )
