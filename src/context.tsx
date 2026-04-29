@@ -30,7 +30,17 @@ import type {
   SupplyRequest,
 } from './types/demo'
 
-const storageKey = 'ultramed-supply-demo-state-v15'
+const storageKey = 'ultramed-supply-demo-state-v25'
+const seniorRoutePaths = new Set([
+  '/senior',
+  '/stock',
+  '/replenishment',
+  '/orders',
+  '/receipt',
+  '/suppliers',
+  '/catalog',
+  '/journal',
+])
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
@@ -49,7 +59,7 @@ function nextNumber(prefix: string, existingIds: string[]) {
   return `${prefix}-${String(max + 1).padStart(3, '0')}`
 }
 
-function createInitialState(role: DemoRole = 'nurse-101', demoStarted = false): DemoState {
+function createInitialState(role: DemoRole = 'nurse-105', demoStarted = false): DemoState {
   return {
     demoStarted,
     role,
@@ -64,9 +74,24 @@ function createInitialState(role: DemoRole = 'nurse-101', demoStarted = false): 
     carts: {
       'room-101': [],
       'room-102': [],
+      'room-105': [],
     },
     activeRequestId: 'REQ-001',
   }
+}
+
+function roleForCurrentRoute(fallback: DemoRole): DemoRole {
+  if (typeof window === 'undefined') {
+    return fallback
+  }
+
+  const { pathname } = window.location
+
+  if (seniorRoutePaths.has(pathname)) return 'senior-nurse'
+  if (pathname === '/analytics') return 'manager'
+  if (pathname === '/cabinet') return 'nurse-105'
+
+  return fallback
 }
 
 function mergeById<T extends { id: string }>(storedItems: T[] | undefined, mockItems: T[]) {
@@ -102,6 +127,7 @@ function mergeRequestLines(storedLines: SupplyRequest['lines'] | undefined, mock
 function hydrateState(storedState: Partial<DemoState>) {
   const initialState = createInitialState()
   const nextState = { ...initialState, ...storedState } as DemoState
+  nextState.role = roleForCurrentRoute(nextState.role)
 
   nextState.rooms = mergeById(nextState.rooms, mockRooms)
   nextState.suppliers = mergeById(nextState.suppliers, mockSuppliers)
@@ -138,13 +164,13 @@ function loadState() {
 
   const stored = window.localStorage.getItem(storageKey)
   if (!stored) {
-    return createInitialState()
+    return createInitialState(roleForCurrentRoute('nurse-105'))
   }
 
   try {
     return hydrateState(JSON.parse(stored) as Partial<DemoState>)
   } catch {
-    return createInitialState()
+    return createInitialState(roleForCurrentRoute('nurse-105'))
   }
 }
 
@@ -263,6 +289,7 @@ interface DemoContextValue {
   startDemo: (role?: DemoRole) => void
   resetDemo: () => void
   setRole: (role: DemoRole) => void
+  loadRequestDraft: (requestId: string) => void
   addCatalogToCart: (itemId: string, quantity: number) => void
   addManualLineToCart: (manualName: string, quantity: number, comment?: string) => void
   updateCartLine: (lineId: string, patch: Partial<RequestCartLine>) => void
@@ -300,18 +327,49 @@ export function DemoProvider({ children }: PropsWithChildren) {
     window.localStorage.setItem(storageKey, JSON.stringify(state))
   }, [state])
 
-  const startDemo = useCallback((role: DemoRole = 'nurse-101') => {
+  const startDemo = useCallback((role: DemoRole = 'nurse-105') => {
     setState(createInitialState(role, true))
   }, [])
 
   const resetDemo = useCallback(() => {
-    const nextState = createInitialState('nurse-101', false)
-    window.localStorage.setItem(storageKey, JSON.stringify(nextState))
-    setState(nextState)
+    setState((current) => {
+      const nextState = createInitialState(current.role, true)
+
+      if (current.activeRequestId && nextState.requests.some((request) => request.id === current.activeRequestId)) {
+        nextState.activeRequestId = current.activeRequestId
+      }
+
+      return nextState
+    })
   }, [])
 
   const setRole = useCallback((role: DemoRole) => {
     setState((current) => ({ ...current, role, uiMessage: undefined }))
+  }, [])
+
+  const loadRequestDraft = useCallback((requestId: string) => {
+    setState((current) => {
+      const source = current.requests.find((request) => request.id === requestId)
+      if (!source) return current
+
+      const next = clone(current)
+      const roleByRoomId: Record<string, DemoRole> = {
+        'room-101': 'nurse-101',
+        'room-102': 'nurse-102',
+        'room-105': 'nurse-105',
+      }
+
+      next.role = roleByRoomId[source.roomId] ?? current.role
+      next.carts[source.roomId] = source.lines.map((line, index) => ({
+        id: `CART-DEMO-${requestId}-${index + 1}`,
+        itemId: line.itemId,
+        manualName: line.manualName,
+        quantity: line.quantity,
+        comment: line.comment,
+      }))
+      next.uiMessage = `Демо-заявка ${requestId} загружена в кабинет`
+      return next
+    })
   }, [])
 
   const addCatalogToCart = useCallback((itemId: string, quantity: number) => {
@@ -895,6 +953,7 @@ export function DemoProvider({ children }: PropsWithChildren) {
       startDemo,
       resetDemo,
       setRole,
+      loadRequestDraft,
       addCatalogToCart,
       addManualLineToCart,
       updateCartLine,
@@ -920,6 +979,7 @@ export function DemoProvider({ children }: PropsWithChildren) {
       startDemo,
       resetDemo,
       setRole,
+      loadRequestDraft,
       addCatalogToCart,
       addManualLineToCart,
       updateCartLine,

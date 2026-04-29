@@ -1,5 +1,5 @@
 import { AnimatePresence } from 'framer-motion'
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppLayout } from './components/AppLayout'
 import { DemoProvider, useDemo } from './context'
@@ -18,18 +18,31 @@ import { SuppliersPage } from './pages/SuppliersPage'
 function RequireSenior({ children }: { children: ReactNode }) {
   const {
     state: { role },
+    setRole,
   } = useDemo()
 
-  return role === 'senior-nurse' || role === 'manager' ? children : <Navigate to="/cabinet" replace />
+  useEffect(() => {
+    if (role !== 'senior-nurse' && role !== 'manager') {
+      setRole('senior-nurse')
+    }
+  }, [role, setRole])
+
+  return role === 'senior-nurse' || role === 'manager' ? children : null
 }
 
 function RequireNurse({ children }: { children: ReactNode }) {
   const {
     state: { role },
+    setRole,
   } = useDemo()
 
-  if (role === 'senior-nurse') return <Navigate to="/senior" replace />
-  if (role === 'manager') return <Navigate to="/analytics" replace />
+  useEffect(() => {
+    if (role !== 'nurse-105') {
+      setRole('nurse-105')
+    }
+  }, [role, setRole])
+
+  if (role !== 'nurse-105') return null
 
   return children
 }

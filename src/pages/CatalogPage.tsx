@@ -10,14 +10,16 @@ export function CatalogPage() {
     state: { catalog, suppliers, requests, rooms },
     reviewManualLine,
   } = useDemo()
+  const activeMaterials = catalog.filter((item) => item.active)
+  const archivedMaterials = catalog.filter((item) => !item.active)
+  const categoryCount = new Set(activeMaterials.map((item) => item.category)).size
   const manualLines = requests.flatMap((request) =>
     request.lines
       .filter((line) => line.manualName)
       .map((line) => ({ request, line, room: rooms.find((room) => room.id === request.roomId) })),
   )
-  const disabledCount = catalog.filter((item) => !item.active).length
-  const missingFieldCount = catalog.filter((item) => !item.price || !item.packageLabel).length
-  const similarCount = catalog.filter((item) => item.shortName.includes('4181') || item.shortName.includes('4191')).length
+  const missingFieldCount = activeMaterials.filter((item) => !item.price || !item.packageLabel).length
+  const replacementApprovalCount = activeMaterials.filter((item) => item.requiresApprovalForReplacement).length
 
   function supplierName(id?: string) {
     return suppliers.find((supplier) => supplier.id === id)?.name ?? '—'
@@ -26,15 +28,18 @@ export function CatalogPage() {
   return (
     <PageTransition className="grid gap-3">
       <Panel>
-        <SectionHeader title="Справочник" subtitle="Демонстрационный раздел старшей медсестры: карточки, контроль и очередь `Позиция не найдена`." />
+        <SectionHeader
+          title="Материалы"
+          subtitle="Единый справочник регулярных стоматологических расходников и материалов, доступный кабинетам для формирования заявок."
+        />
       </Panel>
 
       <div className="grid gap-3 md:grid-cols-4">
         {[
-          ['Есть ручные строки на разбор', manualLines.length, manualLines.length ? 'warning' : 'success'],
-          ['Есть незаполненные поля', missingFieldCount, missingFieldCount ? 'warning' : 'success'],
-          ['Есть похожие позиции', similarCount, 'warning'],
-          ['Есть отключенные позиции', disabledCount, disabledCount ? 'info' : 'success'],
+          ['Активные материалы', activeMaterials.length, 'success'],
+          ['Разделы справочника', categoryCount, 'info'],
+          ['Требуют согласования замены', replacementApprovalCount, replacementApprovalCount ? 'warning' : 'success'],
+          ['Ручные строки на разбор', manualLines.length, manualLines.length ? 'warning' : 'success'],
         ].map(([label, value, tone]) => (
           <Panel key={label} className="p-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</div>
@@ -64,8 +69,8 @@ export function CatalogPage() {
               </tr>
             </thead>
             <tbody>
-              {catalog.map((item) => (
-                <tr key={item.id} className={item.active ? '' : 'bg-slate-50 text-slate-400'}>
+              {activeMaterials.map((item) => (
+                <tr key={item.id}>
                   <td className={tableCell}>{item.fullName}</td>
                   <td className={tableCell}>
                     <div className="font-semibold text-slate-950">{item.shortName}</div>
@@ -97,6 +102,15 @@ export function CatalogPage() {
           </table>
         </div>
       </Panel>
+
+      {missingFieldCount || archivedMaterials.length ? (
+        <Panel className="p-3">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+            {missingFieldCount ? <StatusPill tone="warning">{missingFieldCount} карточек требуют уточнения цены</StatusPill> : null}
+            {archivedMaterials.length ? <StatusPill tone="neutral">{archivedMaterials.length} архивных позиций скрыто из материалов</StatusPill> : null}
+          </div>
+        </Panel>
+      ) : null}
 
       <Panel>
         <div className="flex items-center justify-between gap-3">

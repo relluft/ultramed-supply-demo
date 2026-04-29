@@ -116,14 +116,20 @@ export function WorkspaceSidebar() {
   } = useDemo()
   const location = useLocation()
   const groups = role === 'manager' ? managerGroups : role === 'senior-nurse' ? seniorGroups : nurseGroups
+  const isNurse = role.startsWith('nurse-')
 
   return (
-    <aside className="rounded-lg border border-slate-200 bg-white p-2 shadow-sm lg:sticky lg:top-2 lg:h-[calc(100vh-1rem)] lg:w-[218px] lg:shrink-0">
-      <div className="flex h-16 flex-col items-center justify-center rounded-md px-2.5">
+    <aside
+      className={cn(
+        'rounded-lg border border-slate-200 bg-white p-2 shadow-sm lg:sticky lg:top-2 lg:shrink-0',
+        isNurse ? 'lg:h-auto lg:w-[186px] lg:self-start' : 'lg:h-[calc(100vh-1rem)] lg:w-[218px]',
+      )}
+    >
+      <div className={cn('flex flex-col items-center justify-center rounded-md px-2.5', isNurse ? 'h-14' : 'h-16')}>
         <img
           src="/brand/ultramed-main-logo.svg"
           alt="УльтраМед"
-          className="h-auto w-[156px] max-w-full object-contain object-center"
+          className={cn('h-auto max-w-full object-contain object-center', isNurse ? 'w-[132px]' : 'w-[156px]')}
         />
         <div className="mt-0.5 text-center text-[12px] font-normal leading-none text-[#6089bb]">
           СНАБЖЕНИЕ
@@ -150,7 +156,7 @@ export function WorkspaceSidebar() {
                     item.disabled
                       ? 'cursor-not-allowed text-slate-400 opacity-55'
                       : active
-                        ? 'bg-emerald-700 text-white shadow-sm'
+                        ? 'bg-white pr-6 text-emerald-900 shadow-[0_5px_14px_rgba(15,118,110,0.12)] ring-1 ring-inset ring-emerald-600/35'
                         : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950',
                   )
                   const content = (
@@ -158,11 +164,14 @@ export function WorkspaceSidebar() {
                       <span
                         className={cn(
                           'absolute left-[3px] top-1/2 h-px w-3 -translate-y-1/2',
-                          active && !item.disabled ? 'bg-emerald-700' : 'bg-slate-200',
+                          active && !item.disabled ? 'bg-transparent' : 'bg-slate-200',
                         )}
                       />
                       <Icon size={15} className="shrink-0" />
                       <span className="min-w-0">{item.label}</span>
+                      {active && !item.disabled ? (
+                        <span className="absolute right-2 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-emerald-600 ring-2 ring-emerald-100" />
+                      ) : null}
                     </>
                   )
 

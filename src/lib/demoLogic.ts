@@ -14,6 +14,7 @@ import type {
 export const roleLabels: Record<DemoRole, string> = {
   'nurse-101': 'Кабинет 101',
   'nurse-102': 'Кабинет 102',
+  'nurse-105': 'Кабинет 105',
   'senior-nurse': 'Старшая медсестра',
   manager: 'Руководитель',
 }
@@ -83,6 +84,7 @@ export const replenishmentSourceLabels: Record<ReplenishmentLine['source'], stri
 export function roleToRoomId(role: DemoRole) {
   if (role === 'nurse-101') return 'room-101'
   if (role === 'nurse-102') return 'room-102'
+  if (role === 'nurse-105') return 'room-105'
   return undefined
 }
 

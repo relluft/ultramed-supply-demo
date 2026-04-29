@@ -46,6 +46,14 @@ const loginProfiles: Record<
     route: '/cabinet',
     icon: UserRound,
   },
+  'nurse-105': {
+    title: 'Кабинет',
+    caption: 'Работа с ортодонтическими заявками кабинета 105',
+    login: 'cabinet105@ultramed.local',
+    password: 'demo-105',
+    route: '/cabinet',
+    icon: UserRound,
+  },
   'senior-nurse': {
     title: 'Старшая медсестра',
     caption: 'Склад, выдача, пополнение и приход',
@@ -64,7 +72,7 @@ const loginProfiles: Record<
   },
 }
 
-const roleOrder: DemoRole[] = ['nurse-101', 'senior-nurse', 'manager']
+const roleOrder: DemoRole[] = ['nurse-105', 'senior-nurse', 'manager']
 
 export function StartPage() {
   const navigate = useNavigate()
@@ -215,7 +223,7 @@ export function StartPage() {
                     transition={{ duration: 0.22 }}
                   >
                     <div className="text-xs font-semibold uppercase tracking-wide text-[#7e9289]">
-                      {roleLabels[selectedRole ?? 'nurse-101']}
+                      {roleLabels[selectedRole ?? 'nurse-105']}
                     </div>
 
                     <div className="mt-3 grid gap-3">

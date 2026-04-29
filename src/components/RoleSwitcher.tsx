@@ -5,7 +5,7 @@ import { roleLabels } from '../lib/demoLogic'
 import { cn } from '../lib/format'
 import type { DemoRole } from '../types/demo'
 
-const roles: DemoRole[] = ['nurse-101', 'nurse-102', 'senior-nurse', 'manager']
+const roles: DemoRole[] = ['nurse-101', 'nurse-102', 'nurse-105', 'senior-nurse', 'manager']
 
 export function RoleSwitcher({
   compact = false,

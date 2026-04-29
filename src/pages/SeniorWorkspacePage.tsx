@@ -1,8 +1,11 @@
 import {
   BarChart3,
   BookOpen,
+  ArrowLeft,
+  Check,
   ChevronRight,
   ClipboardList,
+  ListFilter,
   PackageCheck,
   PackagePlus,
   PackageSearch,
@@ -11,7 +14,7 @@ import {
   ShoppingCart,
   Truck,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { PageTransition } from '../components/PageTransition'
 import { Button, EmptyState, StatusPill, fieldStyles } from '../components/ui'
@@ -28,9 +31,18 @@ import { cn, formatDateTime, formatNumber } from '../lib/format'
 import type { CatalogItem, SupplyRequestLine } from '../types/demo'
 
 const allCategory = 'Все разделы'
+const manualCategory = 'Ручные позиции'
 const compactHeaderCell =
-  'sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500'
+  'sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-3 py-2 text-left text-[11px] font-normal uppercase tracking-wide text-slate-500'
 const compactTableCell = 'border-b border-slate-100 px-3 py-1 align-middle text-sm leading-5 text-slate-700'
+const overviewHeaderCell = cn(compactHeaderCell, 'border-r border-slate-200 last:border-r-0')
+const overviewTableCell = cn(compactTableCell, 'border-r border-slate-100 last:border-r-0')
+const detailHeaderCell = cn(compactHeaderCell, 'border-r border-slate-200 !text-center last:border-r-0')
+const detailTableCell = cn(compactTableCell, 'border-r border-slate-100 last:border-r-0')
+
+type IssueDraft =
+  | { mode: 'full' }
+  | { mode: 'partial'; quantity: string }
 
 const seniorDashboardGroups = [
   {
@@ -80,6 +92,13 @@ function matchesCatalogQuery(item: CatalogItem, query: string) {
     .includes(value)
 }
 
+function matchesManualLineQuery(line: SupplyRequestLine, query: string) {
+  const value = query.trim().toLowerCase()
+  if (!value) return true
+
+  return [line.manualName, line.comment, line.seniorComment].filter(Boolean).join(' ').toLowerCase().includes(value)
+}
+
 function SidebarButton({
   active,
   label,
@@ -109,12 +128,14 @@ function SidebarButton({
 
 function ToolIconButton({
   label,
+  icon,
   disabled,
   onClick,
   tone = 'neutral',
   className,
 }: {
   label: string
+  icon?: ReactNode
   disabled?: boolean
   onClick?: () => void
   tone?: 'neutral' | 'success' | 'warning' | 'danger'
@@ -127,14 +148,15 @@ function ToolIconButton({
       onClick={onClick}
       title={label}
       className={cn(
-        'inline-flex min-h-7 shrink-0 items-center justify-center overflow-hidden whitespace-nowrap rounded-md border px-2.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/20 disabled:pointer-events-none disabled:opacity-35',
-        tone === 'neutral' && 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-950',
-        tone === 'success' && 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100',
-        tone === 'warning' && 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100',
-        tone === 'danger' && 'border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100',
+        'inline-flex min-h-7 shrink-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-md border px-2 text-xs font-normal transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700/15 disabled:pointer-events-none disabled:opacity-35',
+        tone === 'neutral' && 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950',
+        tone === 'success' && 'border-emerald-300 bg-white text-emerald-800 hover:border-emerald-400 hover:bg-emerald-50',
+        tone === 'warning' && 'border-amber-300 bg-amber-50 text-amber-900 hover:border-amber-400 hover:bg-amber-100',
+        tone === 'danger' && 'border-rose-300 bg-rose-50 text-rose-800 hover:border-rose-400 hover:bg-rose-100',
         className,
       )}
     >
+      {icon ? <span className="shrink-0">{icon}</span> : null}
       {label}
     </button>
   )
@@ -147,15 +169,15 @@ export function SeniorWorkspacePage() {
     setActiveRequest,
     issueFullLine,
     issuePartialLine,
-    markLineOutOfStock,
-    markLineNeedsClarification,
     addItemToReplenishment,
   } = useDemo()
   const [query, setQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState(allCategory)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
-  const [partialQuantities, setPartialQuantities] = useState<Record<string, number>>({})
+  const [issueDrafts, setIssueDrafts] = useState<Record<string, IssueDraft>>({})
   const [openedRequestId, setOpenedRequestId] = useState<string | null>(null)
+  const [overviewFiltersOpen, setOverviewFiltersOpen] = useState(false)
+  const [overviewQuery, setOverviewQuery] = useState('')
   const isRequestsMode = location.hash === '#requests'
   const isRequestOverview = isRequestsMode && !openedRequestId
 
@@ -163,6 +185,33 @@ export function SeniorWorkspacePage() {
     () => [...requests].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [requests],
   )
+  const visibleRequests = useMemo(() => {
+    const value = overviewQuery.trim().toLowerCase()
+    if (!value) return sortedRequests
+
+    return sortedRequests.filter((request) => {
+      const room = rooms.find((item) => item.id === request.roomId)
+      const lineLabels = request.lines.map((line) => {
+        const item = line.itemId ? catalog.find((candidate) => candidate.id === line.itemId) : undefined
+        return [item?.fullName, item?.shortName, item?.category, line.manualName].filter(Boolean).join(' ')
+      })
+      const haystack = [
+        request.id,
+        request.title,
+        request.comment,
+        request.createdBy,
+        room?.number,
+        room?.title,
+        room?.type,
+        ...lineLabels,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+      return haystack.includes(value)
+    })
+  }, [catalog, overviewQuery, rooms, sortedRequests])
   const openedRequest = openedRequestId ? sortedRequests.find((request) => request.id === openedRequestId) : undefined
   const selectedRequest = openedRequest ?? sortedRequests.find((request) => request.id === activeRequestId) ?? sortedRequests[0]
 
@@ -174,17 +223,32 @@ export function SeniorWorkspacePage() {
       .map((line) => (line.itemId ? catalog.find((item) => item.id === line.itemId) : undefined))
       .filter((item): item is CatalogItem => Boolean(item))
   }, [activeCatalog, catalog, isRequestsMode, selectedRequest])
-  const categorySource = isRequestsMode && openedRequestId ? requestCatalog : activeCatalog
-  const categories = useMemo(
-    () => [allCategory, ...Array.from(new Set(categorySource.map((item) => item.category))).sort((a, b) => a.localeCompare(b, 'ru'))],
-    [categorySource],
+  const manualRequestLines = useMemo(
+    () => (isRequestsMode && openedRequestId && selectedRequest ? selectedRequest.lines.filter((line) => !line.itemId) : []),
+    [isRequestsMode, openedRequestId, selectedRequest],
   )
+  const categorySource = isRequestsMode && openedRequestId ? requestCatalog : activeCatalog
+  const categories = useMemo(() => {
+    const categoryNames = new Set(categorySource.map((item) => item.category))
+    if (manualRequestLines.length) {
+      categoryNames.add(manualCategory)
+    }
+
+    return [allCategory, ...Array.from(categoryNames).sort((a, b) => a.localeCompare(b, 'ru'))]
+  }, [categorySource, manualRequestLines])
   const visibleCatalog = useMemo(
     () =>
       categorySource
         .filter((item) => selectedCategory === allCategory || item.category === selectedCategory)
         .filter((item) => matchesCatalogQuery(item, query)),
     [categorySource, query, selectedCategory],
+  )
+  const visibleManualLines = useMemo(
+    () =>
+      manualRequestLines
+        .filter(() => selectedCategory === allCategory || selectedCategory === manualCategory)
+        .filter((line) => matchesManualLineQuery(line, query)),
+    [manualRequestLines, query, selectedCategory],
   )
   const requestLineByItem = useMemo(() => {
     const result = new Map<string, SupplyRequestLine>()
@@ -199,17 +263,31 @@ export function SeniorWorkspacePage() {
     : visibleCatalog[0] ?? null
   const selectedRequestStats = selectedRequest ? getRequestStats(selectedRequest) : undefined
   const selectedRequestRoom = selectedRequest ? requestRoom(selectedRequest) : undefined
-  const canIssueCount =
-    selectedRequest?.lines.filter((line) => {
-      if (!line.itemId) return false
-      return getStockQuantity(stock, line.itemId) >= line.quantity - line.issuedQuantity
-    }).length ?? 0
+  const validIssueDrafts = selectedRequest
+    ? Object.entries(issueDrafts).filter(([lineId, draft]) => {
+        const line = selectedRequest.lines.find((item) => item.id === lineId)
+        if (!line?.itemId) return false
+
+        const remaining = line.quantity - line.issuedQuantity
+        const available = getStockQuantity(stock, line.itemId)
+        if (draft.mode === 'full') return remaining > 0 && available >= remaining
+
+        const quantity = Math.round(Number(draft.quantity) || 0)
+        return quantity > 0 && quantity <= Math.min(available, remaining)
+      })
+    : []
+  const fullIssueDraftCount = validIssueDrafts.filter(([, draft]) => draft.mode === 'full').length
+  const partialIssueDraftCount = validIssueDrafts.filter(([, draft]) => draft.mode === 'partial').length
 
   useEffect(() => {
     if (!activeRequestId && sortedRequests[0]) {
       setActiveRequest(sortedRequests[0].id)
     }
   }, [activeRequestId, setActiveRequest, sortedRequests])
+
+  useEffect(() => {
+    setIssueDrafts({})
+  }, [selectedRequest?.id])
 
   useEffect(() => {
     if (isRequestsMode) {
@@ -249,16 +327,54 @@ export function SeniorWorkspacePage() {
     }
   }, [isRequestOverview, selectedItemId, selectedRequest, visibleCatalog])
 
-  function issueAllAvailable() {
-    if (!selectedRequest) return
+  function stageFullIssue(lineId: string) {
+    setIssueDrafts((current) => {
+      if (current[lineId]?.mode === 'full') {
+        const { [lineId]: _removed, ...rest } = current
+        return rest
+      }
 
-    selectedRequest.lines.forEach((line) => {
-      if (!line.itemId) return
-      const remaining = line.quantity - line.issuedQuantity
-      if (remaining > 0 && getStockQuantity(stock, line.itemId) >= remaining) {
-        issueFullLine(selectedRequest.id, line.id)
+      return {
+        ...current,
+        [lineId]: { mode: 'full' },
       }
     })
+  }
+
+  function openPartialIssue(lineId: string) {
+    setIssueDrafts((current) => {
+      const existing = current[lineId]
+      if (existing?.mode === 'partial') {
+        const { [lineId]: _removed, ...rest } = current
+        return rest
+      }
+
+      return {
+        ...current,
+        [lineId]: { mode: 'partial', quantity: '' },
+      }
+    })
+  }
+
+  function updatePartialIssue(lineId: string, quantity: string) {
+    setIssueDrafts((current) => ({
+      ...current,
+      [lineId]: { mode: 'partial', quantity },
+    }))
+  }
+
+  function confirmIssueDrafts() {
+    if (!selectedRequest) return
+
+    validIssueDrafts.forEach(([lineId, draft]) => {
+      if (draft.mode === 'full') {
+        issueFullLine(selectedRequest.id, lineId)
+        return
+      }
+
+      issuePartialLine(selectedRequest.id, lineId, Math.round(Number(draft.quantity) || 0))
+    })
+    setIssueDrafts({})
   }
 
   function requestRoom(request: typeof sortedRequests[number]) {
@@ -278,7 +394,7 @@ export function SeniorWorkspacePage() {
     if (!request) return '—'
 
     const room = requestRoom(request)
-    return room ? `${room.number} · ${room.title}` : request.createdBy
+    return room ? `${room.number} ${room.title}` : request.createdBy
   }
 
   function requestStatusLabel(request: typeof sortedRequests[number]) {
@@ -351,17 +467,31 @@ export function SeniorWorkspacePage() {
           <table className="w-full table-fixed border-separate border-spacing-0">
             <thead>
               <tr>
-                <th className={cn(compactHeaderCell, 'w-[180px]')}>Кабинет</th>
-                <th className={cn(compactHeaderCell, 'w-[230px]')}>Заявка</th>
-                <th className={cn(compactHeaderCell, 'w-[112px]')}>Статус</th>
-                <th className={cn(compactHeaderCell, 'w-[82px] text-center')}>Позиций</th>
-                <th className={cn(compactHeaderCell, 'w-[260px]')}>Состав</th>
-                <th className={compactHeaderCell}>Комментарий</th>
-                <th className={cn(compactHeaderCell, 'w-[132px] text-right')}>Отправлено</th>
+                <th className={cn(overviewHeaderCell, 'w-[94px]')}>
+                  <div className="flex justify-center">Дата</div>
+                </th>
+                <th className={cn(overviewHeaderCell, 'w-[150px]')}>
+                  <div className="flex justify-center">Кабинет</div>
+                </th>
+                <th className={cn(overviewHeaderCell, 'w-[360px]')}>
+                  <div className="flex justify-center">Наименование заявки</div>
+                </th>
+                <th className={cn(overviewHeaderCell, 'w-[112px]')}>
+                  <div className="flex justify-center">Статус</div>
+                </th>
+                <th className={cn(overviewHeaderCell, 'w-[86px]')}>
+                  <div className="flex justify-center">Позиций</div>
+                </th>
+                <th className={cn(overviewHeaderCell, 'w-[280px]')}>
+                  <div className="flex justify-center">Состав</div>
+                </th>
+                <th className={cn(overviewHeaderCell, 'w-[420px]')}>
+                  <div className="flex justify-center">Комментарий</div>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {sortedRequests.map((request) => {
+              {visibleRequests.map((request) => {
                 const stats = getRequestStats(request)
                 const firstLine = request.lines[0]
                 const firstItem = firstLine?.itemId ? catalog.find((candidate) => candidate.id === firstLine.itemId) : undefined
@@ -375,36 +505,38 @@ export function SeniorWorkspacePage() {
                   onClick={() => openRequest(request.id)}
                   className="cursor-pointer transition hover:bg-emerald-50/60"
                 >
-                  <td className={cn(compactTableCell, 'whitespace-nowrap font-semibold text-slate-950')}>{requestCabinetLabel(request)}</td>
-                  <td className={compactTableCell}>
-                    <div className="max-w-[300px] truncate font-semibold text-slate-950" title={requestTitle(request)}>
+                  <td className={cn(overviewTableCell, 'whitespace-nowrap text-left text-slate-500')}>{formatDateTime(request.createdAt)}</td>
+                  <td className={cn(overviewTableCell, 'whitespace-nowrap text-slate-950')}>{requestCabinetLabel(request)}</td>
+                  <td className={overviewTableCell}>
+                    <div className="max-w-[410px] truncate text-slate-950" title={requestTitle(request)}>
                       {requestTitle(request)}
                     </div>
                   </td>
-                  <td className={compactTableCell}>
-                    <StatusPill className="whitespace-nowrap" tone={statusTone(request.status)}>
-                      {requestStatusLabel(request)}
-                    </StatusPill>
+                  <td className={cn(overviewTableCell, 'text-center')}>
+                    <div className="flex justify-center">
+                      <StatusPill className="whitespace-nowrap !font-normal" tone={statusTone(request.status)}>
+                        {requestStatusLabel(request)}
+                      </StatusPill>
+                    </div>
                   </td>
-                  <td className={cn(compactTableCell, 'text-center font-semibold text-slate-950')}>{request.lines.length}</td>
-                  <td className={compactTableCell}>
+                  <td className={cn(overviewTableCell, 'text-center text-slate-950')}>{request.lines.length}</td>
+                  <td className={overviewTableCell}>
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="min-w-0 flex-1 truncate text-slate-600">
                         {preview}
                       </span>
                       {stats.manualCount ? (
-                        <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
+                        <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-normal text-amber-800">
                           ручн. {stats.manualCount}
                         </span>
                       ) : null}
                     </div>
                   </td>
-                  <td className={compactTableCell}>
-                    <div className="truncate text-slate-600" title={request.comment}>
+                  <td className={overviewTableCell}>
+                    <div className="whitespace-normal break-words text-slate-600" title={request.comment}>
                       {request.comment || ''}
                     </div>
                   </td>
-                  <td className={cn(compactTableCell, 'whitespace-nowrap text-right text-slate-500')}>{formatDateTime(request.createdAt)}</td>
                 </tr>
               )
             })}
@@ -412,7 +544,9 @@ export function SeniorWorkspacePage() {
           </table>
         </div>
 
-        {!sortedRequests.length ? <EmptyState>Входящих заявок пока нет.</EmptyState> : null}
+        {!visibleRequests.length ? (
+          <EmptyState>{sortedRequests.length ? 'По текущему фильтру заявок нет.' : 'Входящих заявок пока нет.'}</EmptyState>
+        ) : null}
       </div>
     )
   }
@@ -460,20 +594,6 @@ export function SeniorWorkspacePage() {
       <section className="flex h-full min-h-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         {!isRequestOverview ? (
           <aside className="hidden min-h-0 w-[270px] shrink-0 flex-col border-r border-slate-200 bg-slate-50/80 xl:flex">
-            <div className="shrink-0 border-b border-slate-200 p-3">
-              <div className="flex items-center gap-2">
-                <PackageSearch size={18} className="text-emerald-700" />
-                <div>
-                  <div className="text-sm font-semibold text-slate-950">
-                    {isRequestsMode ? requestTitle(selectedRequest) : 'Рабочий список'}
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    {isRequestsMode ? 'состав и фильтр по разделам' : 'материалы и заявки'}
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <div className="min-h-0 flex-1 overflow-auto p-3">
               {isRequestsMode ? (
                 <button
@@ -483,32 +603,40 @@ export function SeniorWorkspacePage() {
                     setSelectedCategory(allCategory)
                     setQuery('')
                   }}
-                  className="mb-3 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-800"
+                  className="mb-3 inline-flex h-8 w-auto items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800"
+                  title="Вернуться к списку заявок"
                 >
-                  Вернуться к списку заявок
+                  <ArrowLeft size={14} />
+                  Назад
                 </button>
               ) : null}
 
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                {isRequestsMode ? 'Разделы в заявке' : 'Разделы'}
-              </div>
-              <div className="mt-2 grid gap-1">
-                {categories.map((category) => {
-                  const count = category === allCategory
-                    ? categorySource.length
-                    : categorySource.filter((item) => item.category === category).length
+              {!isRequestsMode ? (
+                <>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Разделы
+                  </div>
+                  <div className="mt-2 grid gap-1">
+                    {categories.map((category) => {
+                      const count = category === allCategory
+                        ? categorySource.length + manualRequestLines.length
+                        : category === manualCategory
+                          ? manualRequestLines.length
+                          : categorySource.filter((item) => item.category === category).length
 
-                  return (
-                    <SidebarButton
-                      key={category}
-                      active={selectedCategory === category}
-                      label={category}
-                      count={count}
-                      onClick={() => setSelectedCategory(category)}
-                    />
-                  )
-                })}
-              </div>
+                      return (
+                        <SidebarButton
+                          key={category}
+                          active={selectedCategory === category}
+                          label={category}
+                          count={count}
+                          onClick={() => setSelectedCategory(category)}
+                        />
+                      )
+                    })}
+                  </div>
+                </>
+              ) : null}
 
               <div className="mt-4 border-t border-slate-200 pt-3">
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Заявки</div>
@@ -534,7 +662,7 @@ export function SeniorWorkspacePage() {
                         </div>
                         <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-slate-500">
                           <span className="min-w-0 flex-1 truncate">{requestTitle(request)}</span>
-                          <span className="shrink-0">{request.lines.length} строк</span>
+                          <span className="shrink-0">{request.lines.length} позиций</span>
                         </div>
                       </button>
                     )
@@ -553,22 +681,58 @@ export function SeniorWorkspacePage() {
                   <h1 className="text-lg font-semibold leading-none text-slate-950">
                     {isRequestOverview ? 'Заявки кабинетов' : isRequestsMode ? `Состав заявки: ${requestTitle(selectedRequest)}` : 'Материалы и выдача'}
                   </h1>
+                  {isRequestOverview ? (
+                    <button
+                      type="button"
+                      onClick={() => setOverviewFiltersOpen((current) => !current)}
+                      className={cn(
+                        'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/20',
+                        overviewFiltersOpen || overviewQuery
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-950',
+                      )}
+                      title="Фильтры поиска"
+                    >
+                      <ListFilter size={15} />
+                      Фильтры
+                    </button>
+                  ) : null}
                   {!isRequestOverview && selectedRequest ? (
                     <StatusPill tone={statusTone(selectedRequest.status)}>
                       {requestStatusLabel(selectedRequest)}
                     </StatusPill>
                   ) : null}
                 </div>
-                {!isRequestOverview ? (
+                {!isRequestOverview && !isRequestsMode ? (
                   <div className="mt-1 text-sm text-slate-500">
-                    {isRequestsMode
-                      ? 'Здесь показаны только позиции выбранной заявки; разделы слева фильтруют ее состав.'
-                      : 'Таблица материалов, остатки и действия по активной заявке на одном рабочем экране.'}
+                    Таблица материалов, остатки и действия по активной заявке на одном рабочем экране.
                   </div>
                 ) : null}
               </div>
-
             </div>
+
+            {isRequestOverview && overviewFiltersOpen ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-slate-50/70 p-2">
+                <label className="relative min-w-[260px] flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                  <input
+                    value={overviewQuery}
+                    onChange={(event) => setOverviewQuery(event.target.value)}
+                    className={cn(fieldStyles, 'h-9 px-3 py-2 pl-9 text-sm')}
+                    placeholder="Поиск по кабинету, заявке или позиции"
+                  />
+                </label>
+                {overviewQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => setOverviewQuery('')}
+                    className="h-9 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-950"
+                  >
+                    Сбросить
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
 
             {!isRequestOverview ? (
               <div className="mt-4 grid gap-3 xl:grid-cols-[260px_minmax(0,1fr)] xl:items-stretch">
@@ -610,29 +774,29 @@ export function SeniorWorkspacePage() {
               <div className="h-full overflow-y-auto overflow-x-hidden">
             <table className="w-full table-fixed border-separate border-spacing-0">
               <colgroup>
-                <col className="w-[2%]" />
-                <col className="w-[25%]" />
+                <col className="w-[3%]" />
+                <col className="w-[37%]" />
                 <col className="w-[8%]" />
                 <col className="w-[4%]" />
-                <col className="w-[9%]" />
                 <col className="w-[7%]" />
-                <col className="w-[9%]" />
-                <col className="w-[5%]" />
+                <col className="w-[6%]" />
                 <col className="w-[8%]" />
-                <col className="w-[23%]" />
+                <col className="w-[5%]" />
+                <col className="w-[7%]" />
+                <col className="w-[15%]" />
               </colgroup>
               <thead>
                 <tr>
-                  <th className={compactHeaderCell}></th>
-                  <th className={compactHeaderCell}>Наименование</th>
-                  <th className={compactHeaderCell}>Раздел</th>
-                  <th className={compactHeaderCell}>Ед.</th>
-                  <th className={compactHeaderCell}>В заявке</th>
-                  <th className={compactHeaderCell}>Остаток</th>
-                  <th className={compactHeaderCell}>После выдачи</th>
-                  <th className={compactHeaderCell}>Мин.</th>
-                  <th className={compactHeaderCell}>Статус</th>
-                  <th className={compactHeaderCell}>Действия</th>
+                  <th className={cn(detailHeaderCell, '!px-1')}>№</th>
+                  <th className={detailHeaderCell}>Наименование</th>
+                  <th className={detailHeaderCell}>Раздел</th>
+                  <th className={detailHeaderCell}>Ед.</th>
+                  <th className={detailHeaderCell}>В заявке</th>
+                  <th className={detailHeaderCell}>Остаток</th>
+                  <th className={detailHeaderCell}>После выдачи</th>
+                  <th className={detailHeaderCell}>Мин.</th>
+                  <th className={detailHeaderCell}>Статус</th>
+                  <th className={cn(detailHeaderCell, '!px-1')}>Действия</th>
                 </tr>
               </thead>
               <tbody>
@@ -643,105 +807,115 @@ export function SeniorWorkspacePage() {
                   const afterIssue = requestLine ? available - remaining : available
                   const shortage = requestLine ? Math.max(remaining - available, 0) : 0
                   const stockStatus = getStockStatus(item, stock, replenishment)
-                  const partialQuantity = requestLine
-                    ? partialQuantities[requestLine.id] ?? Math.min(available, remaining)
-                    : 0
+                  const issueDraft = requestLine ? issueDrafts[requestLine.id] : undefined
+                  const partialQuantity = issueDraft?.mode === 'partial' ? issueDraft.quantity : ''
+                  const hasPartialQuantity = Math.round(Number(partialQuantity) || 0) > 0
                   const active = selectedItem?.id === item.id
+                  const isIssued = requestLine?.status === 'issued'
                   const rowTone =
-                    active ? 'bg-emerald-50/80' : requestLine ? 'bg-sky-50/45' : index % 2 ? 'bg-white' : 'bg-slate-50/35'
+                    isIssued
+                      ? 'bg-sky-100/80'
+                      : issueDraft?.mode === 'full'
+                      ? 'bg-emerald-50/80'
+                      : issueDraft?.mode === 'partial' && hasPartialQuantity
+                        ? 'bg-amber-50/80'
+                        : active
+                          ? 'bg-sky-50/45'
+                          : requestLine
+                            ? 'bg-sky-50/45'
+                            : index % 2
+                              ? 'bg-white'
+                              : 'bg-slate-50/35'
 
                   return (
                     <tr
                       key={item.id}
                       onClick={() => setSelectedItemId(item.id)}
-                      className={cn('cursor-pointer transition hover:bg-emerald-50/60', rowTone)}
+                      className={cn('cursor-pointer transition hover:bg-slate-100/70', rowTone)}
                     >
-                      <td className={compactTableCell}>
-                        <div className={cn('h-2.5 w-2.5 rounded-full', requestLine ? 'bg-sky-500' : 'bg-slate-300')} />
+                      <td className={cn(detailTableCell, '!px-1 text-center text-xs text-slate-500')}>
+                        {index + 1}
                       </td>
-                      <td className={cn(compactTableCell, 'min-w-0')}>
-                        <div className="whitespace-normal break-words font-semibold leading-5 text-slate-950" title={item.fullName}>
+                      <td className={cn(detailTableCell, 'min-w-0')}>
+                        <div className="whitespace-normal break-words leading-5 text-slate-950" title={item.fullName}>
                           {item.fullName}
                         </div>
                       </td>
-                      <td className={compactTableCell}>{item.category}</td>
-                      <td className={compactTableCell}>{item.unit}</td>
-                      <td className={compactTableCell}>
+                      <td className={detailTableCell}>{item.category}</td>
+                      <td className={cn(detailTableCell, 'text-center')}>{item.unit}</td>
+                      <td className={cn(detailTableCell, 'text-center')}>
                         {requestLine ? (
                           <div>
-                            <div className="whitespace-nowrap font-semibold text-slate-950">
-                              {formatNumber(requestLine.quantity)} {item.unit}
+                            <div className="whitespace-nowrap text-slate-950">
+                              {formatNumber(requestLine.quantity)}
                             </div>
-                            <div className="text-xs text-slate-500">Выдано {formatNumber(requestLine.issuedQuantity)}, осталось {formatNumber(remaining)}</div>
                           </div>
                         ) : (
                           <span className="text-slate-400">—</span>
                         )}
                       </td>
-                      <td className={cn(compactTableCell, 'whitespace-nowrap', available < item.minStock ? 'text-rose-700' : 'text-slate-700')}>
-                        <div className={cn('font-semibold', available < item.minStock ? 'text-rose-700' : 'text-slate-950')}>{formatNumber(available)}</div>
+                      <td className={cn(detailTableCell, 'whitespace-nowrap text-center', available < item.minStock ? 'text-rose-700' : 'text-slate-700')}>
+                        <div className={cn(available < item.minStock ? 'text-rose-700' : 'text-slate-950')}>{formatNumber(available)}</div>
                       </td>
-                      <td className={cn(compactTableCell, 'whitespace-nowrap')}>
+                      <td className={cn(detailTableCell, 'whitespace-nowrap text-center')}>
                         {requestLine ? (
                           <div>
-                            <div className={cn('font-semibold', shortage > 0 ? 'text-rose-700' : afterIssue < item.minStock ? 'text-amber-700' : 'text-emerald-800')}>
+                            <div className={cn(shortage > 0 ? 'text-rose-700' : afterIssue < item.minStock ? 'text-amber-700' : 'text-slate-950')}>
                               {formatNumber(afterIssue)}
                             </div>
-                            <div className={cn('text-xs', shortage > 0 ? 'text-rose-600' : afterIssue < item.minStock ? 'text-amber-700' : 'text-slate-500')}>
+                            <div className={cn('text-xs', shortage > 0 ? 'text-rose-600' : afterIssue < item.minStock ? 'text-amber-700' : 'hidden')}>
                               {shortage > 0 ? `не хватает ${formatNumber(shortage)}` : afterIssue < item.minStock ? 'ниже мин.' : 'норма'}
                             </div>
                           </div>
                         ) : (
-                          <span className="font-semibold text-slate-950">{formatNumber(available)}</span>
+                          <span className="text-slate-950">{formatNumber(available)}</span>
                         )}
                       </td>
-                      <td className={compactTableCell}>{formatNumber(item.minStock)}</td>
-                      <td className={compactTableCell}>
-                        <StatusPill className="whitespace-nowrap" tone={statusTone(requestLine?.status ?? stockStatus)}>
-                          {requestLine ? requestLineStatusLabels[requestLine.status] : stockStatusLabels[stockStatus]}
-                        </StatusPill>
+                      <td className={cn(detailTableCell, 'text-center')}>{formatNumber(item.minStock)}</td>
+                      <td className={detailTableCell}>
+                        <div className="flex justify-center">
+                          <StatusPill className="whitespace-nowrap !font-normal" tone={isIssued ? 'info' : statusTone(requestLine?.status ?? stockStatus)}>
+                            {requestLine ? requestLineStatusLabels[requestLine.status] : stockStatusLabels[stockStatus]}
+                          </StatusPill>
+                        </div>
                       </td>
-                      <td className={compactTableCell} onClick={(event) => event.stopPropagation()}>
+                      <td className={cn(detailTableCell, '!px-1 whitespace-nowrap')} onClick={(event) => event.stopPropagation()}>
                         {requestLine && selectedRequest ? (
-                          <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_3.5rem_minmax(0,1fr)] gap-1.5">
+                          <div className="flex w-full min-w-0 flex-nowrap items-center justify-center gap-1">
                             <ToolIconButton
-                              label="Выдать всё"
-                              tone="success"
-                              className="w-full min-w-0 px-2"
+                              label={issueDraft?.mode === 'full' ? 'Отмена' : 'Выдать'}
+                              icon={issueDraft?.mode === 'full' ? undefined : <Check size={13} strokeWidth={2.2} />}
+                              tone={issueDraft?.mode === 'full' ? 'neutral' : 'success'}
+                              className={cn('!min-h-5 !px-1.5 py-0 text-[10px]', issueDraft?.mode === 'full' && 'border-slate-300 bg-white text-slate-700')}
                               disabled={remaining <= 0 || available < remaining}
-                              onClick={() => issueFullLine(selectedRequest.id, requestLine.id)}
+                              onClick={() => stageFullIssue(requestLine.id)}
                             />
-                            <input
-                              type="number"
-                              min={0}
-                              max={Math.min(available, remaining)}
-                              value={partialQuantity}
-                              onChange={(event) =>
-                                setPartialQuantities((current) => ({
-                                  ...current,
-                                  [requestLine.id]: Number(event.target.value),
-                                }))
-                              }
-                              className="h-7 w-full min-w-0 rounded-md border border-slate-200 bg-white px-2 text-center text-sm outline-none focus:border-emerald-700"
-                            />
-                            <ToolIconButton
-                              label="Выдать"
-                              className="w-full min-w-0 px-2"
-                              disabled={remaining <= 0 || available <= 0}
-                              onClick={() => issuePartialLine(selectedRequest.id, requestLine.id, partialQuantity)}
-                            />
-                            <ToolIconButton
-                              label="Нет на складе"
-                              tone="danger"
-                              className="w-full min-w-0 px-2"
-                              onClick={() => markLineOutOfStock(selectedRequest.id, requestLine.id)}
-                            />
-                            <ToolIconButton
-                              label="Уточнить"
-                              tone="warning"
-                              className="col-span-2 w-full min-w-0 px-2"
-                              onClick={() => markLineNeedsClarification(selectedRequest.id, requestLine.id)}
-                            />
+                            <div className="inline-flex items-center gap-1">
+                              <ToolIconButton
+                                label={issueDraft?.mode === 'partial' ? 'Отмена' : 'Выдать часть'}
+                                className={cn('!min-h-5 !px-1.5 py-0 text-[10px]', issueDraft?.mode === 'partial' && 'border-slate-300 bg-white text-slate-700')}
+                                disabled={remaining <= 0 || available <= 0}
+                                onClick={() => openPartialIssue(requestLine.id)}
+                              />
+                              {issueDraft?.mode === 'partial' ? (
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={Math.min(available, remaining)}
+                                  value={partialQuantity}
+                                  onInput={(event) => updatePartialIssue(requestLine.id, event.currentTarget.value)}
+                                  onChange={(event) => updatePartialIssue(requestLine.id, event.target.value)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter') {
+                                      updatePartialIssue(requestLine.id, event.currentTarget.value)
+                                      event.currentTarget.blur()
+                                    }
+                                  }}
+                                  className="h-5 w-10 rounded-md border border-amber-300 bg-white px-1 text-center text-[11px] text-slate-900 outline-none focus:border-amber-500"
+                                  aria-label="Количество для частичной выдачи"
+                                />
+                              ) : null}
+                            </div>
                           </div>
                         ) : (
                           <div className="grid w-full min-w-0 grid-cols-1 gap-1.5">
@@ -753,21 +927,66 @@ export function SeniorWorkspacePage() {
                     </tr>
                   )
                 })}
+                {visibleManualLines.map((line, index) => (
+                  <tr
+                    key={line.id}
+                    className={cn(
+                      'transition hover:bg-amber-50/70',
+                      index % 2 ? 'bg-white' : 'bg-amber-50/35',
+                    )}
+                  >
+                    <td className={cn(detailTableCell, '!px-1 text-center text-xs text-slate-500')}>
+                      {visibleCatalog.length + index + 1}
+                    </td>
+                    <td className={cn(detailTableCell, 'min-w-0')}>
+                      <div className="whitespace-normal break-words leading-5 text-slate-950" title={line.manualName}>
+                        {line.manualName}
+                      </div>
+                      {line.seniorComment ? <div className="mt-1 text-xs text-slate-500">{line.seniorComment}</div> : null}
+                    </td>
+                    <td className={detailTableCell}>{manualCategory}</td>
+                    <td className={cn(detailTableCell, 'text-center')}>шт.</td>
+                    <td className={cn(detailTableCell, 'text-center')}>
+                      <div className="whitespace-nowrap text-slate-950">
+                        {formatNumber(line.quantity)}
+                      </div>
+                    </td>
+                    <td className={cn(detailTableCell, 'text-center')}>—</td>
+                    <td className={cn(detailTableCell, 'text-center')}>
+                      <div className="text-amber-700">сверить</div>
+                      <div className="text-xs text-slate-500">нет в справочнике</div>
+                    </td>
+                    <td className={cn(detailTableCell, 'text-center')}>—</td>
+                    <td className={detailTableCell}>
+                      <div className="flex justify-center">
+                        <StatusPill className="whitespace-nowrap !font-normal" tone={statusTone(line.status)}>
+                          {requestLineStatusLabels[line.status]}
+                        </StatusPill>
+                      </div>
+                    </td>
+                    <td className={detailTableCell} onClick={(event) => event.stopPropagation()}>
+                      <span className="block text-center text-xs text-slate-400">—</span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
 
-            {!visibleCatalog.length ? <EmptyState className="m-3">По текущему фильтру материалов нет.</EmptyState> : null}
+            {!visibleCatalog.length && !visibleManualLines.length ? (
+              <EmptyState className="m-3">По текущему фильтру материалов нет.</EmptyState>
+            ) : null}
               </div>
             </div>
 
-            <div className="mt-2 flex shrink-0 flex-wrap justify-end gap-2">
-              <Button variant="success" disabled={!canIssueCount} onClick={issueAllAvailable}>
+            <div className="mt-2 flex shrink-0 flex-wrap items-center justify-end gap-3 rounded-md border border-slate-200 bg-white px-3 py-2">
+              <div className="text-right text-xs text-slate-500">
+                {validIssueDrafts.length
+                  ? `К выдаче: ${fullIssueDraftCount}; частично: ${partialIssueDraftCount}`
+                  : 'Выберите строки для выдачи'}
+              </div>
+              <Button variant="primary" disabled={!validIssueDrafts.length} onClick={confirmIssueDrafts}>
                 <PackageCheck size={16} />
-                Выдать доступное
-              </Button>
-              <Button variant="secondary" disabled={!selectedItem} onClick={() => selectedItem && addItemToReplenishment(selectedItem.id)}>
-                <PackagePlus size={16} />
-                Пополнение
+                Подтвердить и выдать
               </Button>
             </div>
           </div>
