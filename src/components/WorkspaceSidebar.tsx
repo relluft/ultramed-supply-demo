@@ -3,7 +3,7 @@ import {
   BookOpen,
   ClipboardList,
   Home,
-  PackageCheck,
+  PackagePlus,
   PackageSearch,
   Receipt,
   ShoppingCart,
@@ -28,34 +28,27 @@ type SidebarGroup = {
 
 const seniorGroups: SidebarGroup[] = [
   {
-    title: 'Главная',
-    icon: Home,
-    items: [
-      { to: '/senior', label: 'Главная', icon: Home },
-    ],
-  },
-  {
-    title: 'Отчеты',
-    icon: BarChart3,
-    items: [
-      { to: '/stock', label: 'Остатки', icon: PackageSearch },
-      { to: '/journal#turnover', label: 'Оборот', icon: ClipboardList },
-      { to: '/analytics#stock', label: 'Анализ остатков', icon: BarChart3, disabled: true },
-      { to: '/analytics#inventory', label: 'Анализ инвентаризации', icon: BarChart3, disabled: true },
-    ],
-  },
-  {
-    title: 'Накладные',
+    title: 'Работа',
     icon: ClipboardList,
     items: [
       { to: '/senior#requests', label: 'Заявки', icon: ClipboardList },
-      { to: '/orders', label: 'Закупка', icon: ShoppingCart },
-      { to: '/senior#issue', label: 'Выдача', icon: PackageCheck, disabled: true },
-      { to: '/journal#writeoff', label: 'Списание', icon: ClipboardList, disabled: true },
-      { to: '/stock#inventory', label: 'Инвентаризация', icon: PackageSearch, disabled: true },
-      { to: '/receipt', label: 'Приход', icon: Receipt, disabled: true },
-      { to: '/journal#sales', label: 'Продажа', icon: Receipt, disabled: true },
-      { to: '/suppliers#settlements', label: 'Расчеты с поставщиками', icon: Truck, disabled: true },
+      { to: '/replenishment', label: 'Пополнение', icon: PackagePlus },
+      { to: '/orders', label: 'Заказы поставщикам', icon: ShoppingCart },
+      { to: '/receipt', label: 'Приход', icon: Receipt },
+    ],
+  },
+  {
+    title: 'Склад',
+    icon: PackageSearch,
+    items: [
+      { to: '/stock', label: 'Остатки', icon: PackageSearch },
+    ],
+  },
+  {
+    title: 'Контроль',
+    icon: BarChart3,
+    items: [
+      { to: '/analytics', label: 'Аналитические отчеты', icon: BarChart3 },
     ],
   },
   {
@@ -64,13 +57,6 @@ const seniorGroups: SidebarGroup[] = [
     items: [
       { to: '/catalog', label: 'Материалы', icon: BookOpen },
       { to: '/suppliers', label: 'Поставщики', icon: Truck },
-    ],
-  },
-  {
-    title: 'Аналитика',
-    icon: BarChart3,
-    items: [
-      { to: '/analytics', label: 'Аналитические отчеты', icon: BarChart3 },
     ],
   },
 ]
@@ -105,6 +91,10 @@ function isItemActive(to: string, pathname: string, hash: string) {
 
   if (to.includes('#')) {
     return current === to
+  }
+
+  if (to === '/orders' && pathname.startsWith('/orders')) {
+    return !hash
   }
 
   return pathname === to && !hash
@@ -142,7 +132,7 @@ export function WorkspaceSidebar() {
 
           return (
             <section key={group.title}>
-              <div className="mb-1.5 flex items-center gap-2 px-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              <div className="mb-1.5 flex items-center gap-2 px-2 text-[11px] font-normal uppercase tracking-wide text-slate-400">
                 <GroupIcon size={13} />
                 {group.title}
               </div>
@@ -152,7 +142,7 @@ export function WorkspaceSidebar() {
                   const Icon = item.icon
                   const active = isItemActive(item.to, location.pathname, location.hash)
                   const className = cn(
-                    'relative flex min-h-7 items-center gap-2 rounded-md py-1 pl-4 pr-2 text-[13px] font-semibold leading-4 transition',
+                    'relative flex min-h-7 items-center gap-2 rounded-md py-1 pl-4 pr-2 text-[13px] font-normal leading-4 transition',
                     item.disabled
                       ? 'cursor-not-allowed text-slate-400 opacity-55'
                       : active

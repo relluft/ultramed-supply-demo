@@ -30,11 +30,11 @@ export function AppLayout() {
       )}
     >
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button variant="ghost" className="min-h-8 px-2 py-1 text-xs font-semibold text-slate-400 hover:text-slate-700" onClick={handleResetDemo}>
+        <Button variant="ghost" className="min-h-8 px-2 py-1 text-xs font-normal text-slate-400 hover:text-slate-700" onClick={handleResetDemo}>
           <RotateCcw size={14} />
           Сбросить демо
         </Button>
-        <div className="flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700">
+        <div className="flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-700">
           <UserRound size={16} className="text-slate-500" />
           {roleLabels[role]}
         </div>

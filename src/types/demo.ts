@@ -121,6 +121,7 @@ export interface SupplyRequestLine {
 export interface ReplenishmentLine {
   id: string
   itemId: string
+  requestId?: string
   source: 'after-issue' | 'below-minimum' | 'manual' | 'not-enough'
   currentStock: number
   minStock: number
@@ -137,10 +138,14 @@ export interface ReplenishmentLine {
 
 export interface SupplierOrder {
   id: string
+  purchasePackageId?: string
   supplierId: string
   createdAt: string
+  formedAt?: string
   status: SupplierOrderStatus
   lines: SupplierOrderLine[]
+  documentName?: string
+  receiptDocumentNumber?: string
   comment?: string
 }
 
@@ -152,6 +157,7 @@ export interface SupplierOrderLine {
   price?: number
   status: AvailabilityStatus | SupplierOrderStatus
   comment?: string
+  receiptComment?: string
   receivedQuantity?: number
 }
 

@@ -11,6 +11,9 @@ import type {
   SupplierOrderStatus,
 } from '../types/demo'
 
+export const clinicMainSupplierId = 'sup-stommarket'
+export const clinicBackupSupplierId = 'sup-dentalpost'
+
 export const roleLabels: Record<DemoRole, string> = {
   'nurse-101': 'Кабинет 101',
   'nurse-102': 'Кабинет 102',

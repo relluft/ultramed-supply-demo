@@ -16,7 +16,7 @@ import {
   mockStock,
   mockSuppliers,
 } from './data/mockData'
-import { getRecommendedQuantity, isReadyForOrder, roleToRoomId } from './lib/demoLogic'
+import { clinicBackupSupplierId, clinicMainSupplierId, getRecommendedQuantity, isReadyForOrder, roleToRoomId } from './lib/demoLogic'
 import { clampNumber } from './lib/format'
 import type {
   AvailabilityStatus,
@@ -27,15 +27,25 @@ import type {
   ReplenishmentLine,
   RequestCartLine,
   RequestLineStatus,
+  SupplierOrder,
   SupplyRequest,
 } from './types/demo'
 
-const storageKey = 'ultramed-supply-demo-state-v25'
+const storageKey = 'ultramed-supply-demo-state'
+const legacyStorageKeys = [
+  'ultramed-supply-demo-state-v29',
+  'ultramed-supply-demo-state-v28',
+  'ultramed-supply-demo-state-v27',
+  'ultramed-supply-demo-state-v26',
+  'ultramed-supply-demo-state-v25',
+]
+const orthodonticDemoRequestId = 'REQ-005'
 const seniorRoutePaths = new Set([
   '/senior',
   '/stock',
   '/replenishment',
   '/orders',
+  '/orders/forming',
   '/receipt',
   '/suppliers',
   '/catalog',
@@ -76,7 +86,7 @@ function createInitialState(role: DemoRole = 'nurse-105', demoStarted = false): 
       'room-102': [],
       'room-105': [],
     },
-    activeRequestId: 'REQ-001',
+    activeRequestId: orthodonticDemoRequestId,
   }
 }
 
@@ -104,14 +114,51 @@ function mergeById<T extends { id: string }>(storedItems: T[] | undefined, mockI
   ]
 }
 
+const demoOutOfStockItemIds = new Set(['item-suture-4-0', 'item-ortho-primer'])
+const demoBelowMinimumItemIds = new Set(['item-composite-a2', 'item-niti-archwires'])
+const demoNearMinimumItemIds = new Set(['item-articaine', 'item-airflow-powder'])
+
+function demoStockQuantityForItem(item: (typeof mockCatalog)[number]) {
+  if (demoOutOfStockItemIds.has(item.id)) return 0
+  if (demoBelowMinimumItemIds.has(item.id)) return Math.max(item.minStock - 1, 0)
+  if (demoNearMinimumItemIds.has(item.id)) return item.minStock
+
+  return Math.max(item.desiredStock, item.minStock + 4, 6)
+}
+
+function normalizeStockForCatalog(items: DemoState['stock']) {
+  const byItemId = new Map(items.map((item) => [item.itemId, item]))
+  mockCatalog
+    .filter((item) => item.active)
+    .forEach((item) => {
+      const current = byItemId.get(item.id)
+      const shouldNormalize =
+        !current ||
+        current.quantity <= 0 ||
+        demoOutOfStockItemIds.has(item.id) ||
+        demoBelowMinimumItemIds.has(item.id) ||
+        demoNearMinimumItemIds.has(item.id)
+
+      if (shouldNormalize) {
+        byItemId.set(item.id, {
+          itemId: item.id,
+          quantity: demoStockQuantityForItem(item),
+          lastMovementAt: current?.lastMovementAt ?? '2026-04-28T08:35:00+03:00',
+        })
+      }
+    })
+
+  return Array.from(byItemId.values())
+}
+
 function mergeStock(storedItems: DemoState['stock'] | undefined) {
   const storedByItemId = new Map((storedItems ?? []).map((item) => [item.itemId, item]))
   const mockItemIds = new Set(mockStock.map((item) => item.itemId))
 
-  return [
+  return normalizeStockForCatalog([
     ...mockStock.map((mockItem) => storedByItemId.get(mockItem.itemId) ?? mockItem),
     ...(storedItems ?? []).filter((item) => !mockItemIds.has(item.itemId)),
-  ]
+  ])
 }
 
 function mergeRequestLines(storedLines: SupplyRequest['lines'] | undefined, mockLines: SupplyRequest['lines']) {
@@ -124,6 +171,22 @@ function mergeRequestLines(storedLines: SupplyRequest['lines'] | undefined, mock
   ]
 }
 
+function looksLikeGeneratedRequestTitle(title: string | undefined, catalog = mockCatalog) {
+  const normalizedTitle = title?.trim().replace(/_/g, ' ')
+  if (!normalizedTitle) return false
+
+  return (
+    (normalizedTitle.includes(',') && /\+\s*\d+$/.test(normalizedTitle)) ||
+    catalog.some((item) => normalizedTitle.includes(item.shortName) || normalizedTitle.includes(item.fullName))
+  )
+}
+
+function defaultRequestTitle(roomId?: string) {
+  const room = mockRooms.find((item) => item.id === roomId)
+  if (roomId === 'room-105') return 'Ортодонтия май расходники'
+  return `${room?.title ?? 'Кабинет'}: материалы на прием`
+}
+
 function hydrateState(storedState: Partial<DemoState>) {
   const initialState = createInitialState()
   const nextState = { ...initialState, ...storedState } as DemoState
@@ -134,7 +197,10 @@ function hydrateState(storedState: Partial<DemoState>) {
   nextState.catalog = mergeById(nextState.catalog, mockCatalog)
   nextState.stock = mergeStock(nextState.stock)
 
-  nextState.requests = (nextState.requests ?? []).map((request) => {
+  const storedRequests = nextState.requests ?? []
+  const storedRequestById = new Map(storedRequests.map((request) => [request.id, request]))
+  const mockRequestIds = new Set(mockRequests.map((request) => request.id))
+  const normalizeRequest = (request: SupplyRequest) => {
     const mockRequest = mockRequests.find((item) => item.id === request.id)
 
     if (mockRequest) {
@@ -150,9 +216,22 @@ function hydrateState(storedState: Partial<DemoState>) {
     const normalizedTitle = request.title?.replace(/_/g, ' ')
     return {
       ...request,
-      title: normalizedTitle,
+      title: looksLikeGeneratedRequestTitle(normalizedTitle, nextState.catalog)
+        ? defaultRequestTitle(request.roomId)
+        : normalizedTitle,
     }
-  })
+  }
+
+  nextState.requests = [
+    ...mockRequests.map((mockRequest) => normalizeRequest(storedRequestById.get(mockRequest.id) ?? mockRequest)),
+    ...storedRequests.filter((request) => !mockRequestIds.has(request.id)).map(normalizeRequest),
+  ]
+
+  if (!nextState.activeRequestId || !nextState.requests.some((request) => request.id === nextState.activeRequestId)) {
+    nextState.activeRequestId = orthodonticDemoRequestId
+  }
+
+  normalizeReplenishmentSuppliers(nextState)
 
   return nextState
 }
@@ -162,7 +241,9 @@ function loadState() {
     return createInitialState()
   }
 
-  const stored = window.localStorage.getItem(storageKey)
+  const stored =
+    window.localStorage.getItem(storageKey) ??
+    legacyStorageKeys.map((key) => window.localStorage.getItem(key)).find((value): value is string => Boolean(value))
   if (!stored) {
     return createInitialState(roleForCurrentRoute('nurse-105'))
   }
@@ -199,6 +280,58 @@ function getStock(state: DemoState, itemId: string) {
   }
 
   return stock
+}
+
+function isReplenishmentSupplierId(supplierId: string) {
+  return supplierId === clinicMainSupplierId || supplierId === clinicBackupSupplierId
+}
+
+function preferredSupplierIdForItem(_item: { primarySupplierId: string; alternativeSupplierIds: string[] }) {
+  return clinicMainSupplierId
+}
+
+function normalizeReplenishmentSuppliers(state: DemoState) {
+  state.replenishment = (state.replenishment ?? []).map((line) => {
+    const item = getItem(state, line.itemId)
+    if (!item) return line
+
+    const preferredSupplierId = preferredSupplierIdForItem(item)
+    const shouldUseMainSupplier = !isReplenishmentSupplierId(line.selectedSupplierId)
+    if (!shouldUseMainSupplier || line.selectedSupplierId === preferredSupplierId) return line
+
+    return {
+      ...line,
+      selectedSupplierId: preferredSupplierId,
+    }
+  })
+}
+
+function getOrderQuantity(item: ReturnType<typeof getItem>, line: ReplenishmentLine) {
+  if (line.recommendedQuantity > 0) return line.recommendedQuantity
+  if (item) return Math.max(getRecommendedQuantity(item, line.currentStock), line.minStock - line.currentStock, 1)
+
+  return Math.max(line.desiredStock - line.currentStock, line.minStock - line.currentStock, 1)
+}
+
+function buildRequestTitle(state: DemoState, cart: RequestCartLine[], roomTitle?: string) {
+  const sourceRequest = state.requests.find(
+    (request) =>
+      request.title?.trim() &&
+      request.lines.length === cart.length &&
+      request.lines.every((line, index) => {
+        const cartLine = cart[index]
+        return (
+          cartLine &&
+          line.itemId === cartLine.itemId &&
+          line.manualName === cartLine.manualName &&
+          line.quantity === cartLine.quantity
+        )
+      }),
+  )
+
+  if (sourceRequest?.title) return sourceRequest.title
+
+  return roomTitle === 'Ортодонтия' ? 'Ортодонтия май расходники' : `${roomTitle ?? 'Кабинет'}: материалы на прием`
 }
 
 function recalculateRequestStatus(request: SupplyRequest) {
@@ -246,15 +379,14 @@ function ensureReplenishment(
   if (!item) return
 
   const stock = getStock(state, itemId)
-  const recommendedQuantity = getRecommendedQuantity(item, stock.quantity)
   const existing = state.replenishment.find((line) => line.itemId === itemId && !line.closedAt)
 
   if (existing) {
     existing.currentStock = stock.quantity
     existing.minStock = item.minStock
     existing.desiredStock = item.desiredStock
-    existing.recommendedQuantity = recommendedQuantity
     existing.source = source === 'not-enough' ? 'not-enough' : existing.source
+    existing.requestId = requestId ?? existing.requestId
     existing.includedInOrder = existing.includedInOrder ?? true
     return
   }
@@ -262,12 +394,13 @@ function ensureReplenishment(
   state.replenishment.unshift({
     id: `REP-${itemId}-${Date.now()}`,
     itemId,
+    requestId,
     source,
     currentStock: stock.quantity,
     minStock: item.minStock,
     desiredStock: item.desiredStock,
-    recommendedQuantity,
-    selectedSupplierId: item.primarySupplierId,
+    recommendedQuantity: 0,
+    selectedSupplierId: preferredSupplierIdForItem(item),
     availabilityStatus: 'not-checked',
     comment: description,
     createdAt: now(),
@@ -303,11 +436,15 @@ interface DemoContextValue {
   reviewManualLine: (requestId: string, lineId: string, action: string) => void
   addItemToReplenishment: (itemId: string) => void
   updateReplenishmentAvailability: (lineId: string, status: AvailabilityStatus) => void
+  prepareReplenishmentInquiry: (supplierId: string, lineIds: string[]) => void
   selectReplenishmentSupplier: (lineId: string, supplierId: string) => void
+  updateReplenishmentQuantity: (lineId: string, quantity: number) => void
   updateReplenishmentComment: (lineId: string, comment: string) => void
   toggleReplenishmentInOrder: (lineId: string, included: boolean) => void
   formSupplierOrders: () => string[]
   markOrderAsOrdered: (orderId: string) => void
+  updateReceiptDocumentNumber: (orderId: string, documentNumber: string) => void
+  updateReceiptLineComment: (orderId: string, lineId: string, comment: string) => void
   acceptReceipt: (orderId: string, receivedByLineId: Record<string, number>) => void
 }
 
@@ -328,7 +465,12 @@ export function DemoProvider({ children }: PropsWithChildren) {
   }, [state])
 
   const startDemo = useCallback((role: DemoRole = 'nurse-105') => {
-    setState(createInitialState(role, true))
+    setState((current) => ({
+      ...current,
+      demoStarted: true,
+      role,
+      uiMessage: undefined,
+    }))
   }, [])
 
   const resetDemo = useCallback(() => {
@@ -472,6 +614,7 @@ export function DemoProvider({ children }: PropsWithChildren) {
         createdBy: room?.nurseName ?? 'Медсестра',
         createdAt,
         status: 'sent',
+        title: buildRequestTitle(next, cart, room?.title),
         comment: comment?.trim(),
         lines: cart.map((line, index) => ({
           id: `${requestId}-L${index + 1}`,
@@ -758,6 +901,39 @@ export function DemoProvider({ children }: PropsWithChildren) {
     })
   }, [])
 
+  const prepareReplenishmentInquiry = useCallback((supplierId: string, lineIds: string[]) => {
+    setState((current) => {
+      if (!isReplenishmentSupplierId(supplierId) || !lineIds.length) return current
+
+      const next = clone(current)
+      const lineIdSet = new Set(lineIds)
+      const inquiryLines = next.replenishment.filter(
+        (line) =>
+          lineIdSet.has(line.id) &&
+          !line.closedAt &&
+          line.includedInOrder !== false &&
+          (line.availabilityStatus === 'not-checked' || line.availabilityStatus === 'checking'),
+      )
+      if (!inquiryLines.length) return current
+
+      inquiryLines.forEach((line) => {
+        line.selectedSupplierId = supplierId
+        line.availabilityStatus = 'checking'
+        line.lastCheckedAt = now()
+      })
+
+      const supplier = next.suppliers.find((item) => item.id === supplierId)
+      addJournal(next, {
+        actorRole: 'senior-nurse',
+        type: 'availability-updated',
+        title: 'Подготовлен запрос наличия',
+        description: `${supplier?.name ?? 'Поставщик'}: подготовлен Excel-запрос на ${inquiryLines.length} позиций.`,
+      })
+      next.uiMessage = `Запрос наличия подготовлен: ${supplier?.name ?? 'поставщик'}, ${inquiryLines.length} поз.`
+      return next
+    })
+  }, [])
+
   const selectReplenishmentSupplier = useCallback((lineId: string, supplierId: string) => {
     setState((current) => {
       const next = clone(current)
@@ -765,11 +941,11 @@ export function DemoProvider({ children }: PropsWithChildren) {
       if (!line) return current
 
       const item = getItem(next, line.itemId)
-      const allowed = item ? [item.primarySupplierId, ...item.alternativeSupplierIds] : []
+      const allowed = [clinicMainSupplierId, clinicBackupSupplierId]
       if (!allowed.includes(supplierId)) return current
 
       line.selectedSupplierId = supplierId
-      line.availabilityStatus = supplierId === item?.primarySupplierId ? 'available' : 'alternative-selected'
+      line.availabilityStatus = 'not-checked'
       line.lastCheckedAt = now()
       const supplier = next.suppliers.find((item) => item.id === supplierId)
       addJournal(next, {
@@ -794,6 +970,17 @@ export function DemoProvider({ children }: PropsWithChildren) {
     })
   }, [])
 
+  const updateReplenishmentQuantity = useCallback((lineId: string, quantity: number) => {
+    setState((current) => {
+      const next = clone(current)
+      const line = next.replenishment.find((item) => item.id === lineId)
+      if (!line) return current
+
+      line.recommendedQuantity = clampNumber(Math.round(quantity || 0), 0, 999)
+      return next
+    })
+  }, [])
+
   const toggleReplenishmentInOrder = useCallback((lineId: string, included: boolean) => {
     setState((current) => {
       const next = clone(current)
@@ -810,6 +997,10 @@ export function DemoProvider({ children }: PropsWithChildren) {
 
     setState((current) => {
       const next = clone(current)
+      const packageId = nextNumber(
+        'PACK',
+        next.orders.map((order) => order.purchasePackageId).filter((id): id is string => Boolean(id)),
+      )
       const existingReplenishmentLineIds = new Set(
         next.orders.flatMap((order) => order.lines.map((line) => line.replenishmentLineId)),
       )
@@ -817,7 +1008,6 @@ export function DemoProvider({ children }: PropsWithChildren) {
         (line) =>
           !line.closedAt &&
           line.includedInOrder !== false &&
-          line.recommendedQuantity > 0 &&
           isReadyForOrder(line.availabilityStatus) &&
           !existingReplenishmentLineIds.has(line.id),
       )
@@ -827,18 +1017,22 @@ export function DemoProvider({ children }: PropsWithChildren) {
         return next
       }
 
+      const packageOrdersBySupplierId = new Map<string, SupplierOrder>()
+
       readyLines.forEach((line) => {
         line.availabilityStatus = 'ready-to-order'
         const item = getItem(next, line.itemId)
-        let order = next.orders.find(
-          (candidate) =>
-            candidate.supplierId === line.selectedSupplierId &&
-            (candidate.status === 'draft' || candidate.status === 'ready-to-order'),
-        )
+        if (item && !isReplenishmentSupplierId(line.selectedSupplierId)) {
+          line.selectedSupplierId = preferredSupplierIdForItem(item)
+        }
+        const quantity = getOrderQuantity(item, line)
+        line.recommendedQuantity = quantity
+        let order = packageOrdersBySupplierId.get(line.selectedSupplierId)
 
         if (!order) {
           order = {
             id: nextNumber('ORD', [...next.orders.map((item) => item.id), ...createdOrderIds]),
+            purchasePackageId: packageId,
             supplierId: line.selectedSupplierId,
             createdAt: now(),
             status: 'draft',
@@ -846,13 +1040,16 @@ export function DemoProvider({ children }: PropsWithChildren) {
           }
           createdOrderIds.push(order.id)
           next.orders.unshift(order)
+          packageOrdersBySupplierId.set(line.selectedSupplierId, order)
         }
+
+        order.purchasePackageId = packageId
 
         order.lines.push({
           id: `${order.id}-L${order.lines.length + 1}`,
           itemId: line.itemId,
           replenishmentLineId: line.id,
-          quantity: line.recommendedQuantity,
+          quantity,
           price: item?.price,
           status: 'ready-to-order',
           comment: line.comment,
@@ -863,9 +1060,9 @@ export function DemoProvider({ children }: PropsWithChildren) {
         actorRole: 'senior-nurse',
         type: 'order-created',
         title: 'Заказ сформирован',
-        description: `Сформированы группы заказов по поставщикам: ${readyLines.length} строк.`,
+        description: `Сформирован пакет закупки ${packageId}: ${createdOrderIds.length} заказ(а) поставщикам, ${readyLines.length} строк.`,
       })
-      next.uiMessage = 'Заказ сформирован по подтвержденным строкам'
+      next.uiMessage = `Пакет закупки ${packageId} сформирован`
       return next
     })
 
@@ -878,20 +1075,45 @@ export function DemoProvider({ children }: PropsWithChildren) {
       const order = next.orders.find((item) => item.id === orderId)
       if (!order) return current
 
+      const supplier = next.suppliers.find((item) => item.id === order.supplierId)
       order.status = 'waiting-receipt'
+      order.formedAt = order.formedAt ?? now()
+      order.documentName = order.documentName ?? `${order.id}-${supplier?.name ?? 'supplier'}.xls`
       order.lines.forEach((line) => {
         line.status = 'waiting-receipt'
         const replenishment = next.replenishment.find((item) => item.id === line.replenishmentLineId)
         if (replenishment) replenishment.availabilityStatus = 'waiting-receipt'
       })
 
-      const supplier = next.suppliers.find((item) => item.id === order.supplierId)
       addJournal(next, {
         actorRole: 'senior-nurse',
         type: 'order-marked',
         title: 'Заказ отмечен как заказанный',
         description: `${order.id} у поставщика ${supplier?.name ?? 'поставщик'} ожидает прихода.`,
       })
+      return next
+    })
+  }, [])
+
+  const updateReceiptDocumentNumber = useCallback((orderId: string, documentNumber: string) => {
+    setState((current) => {
+      const next = clone(current)
+      const order = next.orders.find((item) => item.id === orderId)
+      if (!order) return current
+
+      order.receiptDocumentNumber = documentNumber.trim()
+      return next
+    })
+  }, [])
+
+  const updateReceiptLineComment = useCallback((orderId: string, lineId: string, comment: string) => {
+    setState((current) => {
+      const next = clone(current)
+      const order = next.orders.find((item) => item.id === orderId)
+      const line = order?.lines.find((item) => item.id === lineId)
+      if (!line) return current
+
+      line.receiptComment = comment
       return next
     })
   }, [])
@@ -917,7 +1139,7 @@ export function DemoProvider({ children }: PropsWithChildren) {
         const replenishment = next.replenishment.find((item) => item.id === line.replenishmentLineId)
         if (replenishment && item) {
           replenishment.currentStock = stock.quantity
-          replenishment.recommendedQuantity = getRecommendedQuantity(item, stock.quantity)
+          replenishment.recommendedQuantity = 0
           if ((line.receivedQuantity ?? 0) >= line.quantity) {
             replenishment.closedAt = now()
           }
@@ -967,11 +1189,15 @@ export function DemoProvider({ children }: PropsWithChildren) {
       reviewManualLine,
       addItemToReplenishment,
       updateReplenishmentAvailability,
+      prepareReplenishmentInquiry,
       selectReplenishmentSupplier,
+      updateReplenishmentQuantity,
       updateReplenishmentComment,
       toggleReplenishmentInOrder,
       formSupplierOrders,
       markOrderAsOrdered,
+      updateReceiptDocumentNumber,
+      updateReceiptLineComment,
       acceptReceipt,
     }),
     [
@@ -993,11 +1219,15 @@ export function DemoProvider({ children }: PropsWithChildren) {
       reviewManualLine,
       addItemToReplenishment,
       updateReplenishmentAvailability,
+      prepareReplenishmentInquiry,
       selectReplenishmentSupplier,
+      updateReplenishmentQuantity,
       updateReplenishmentComment,
       toggleReplenishmentInOrder,
       formSupplierOrders,
       markOrderAsOrdered,
+      updateReceiptDocumentNumber,
+      updateReceiptLineComment,
       acceptReceipt,
     ],
   )

@@ -12,6 +12,7 @@ import { ReplenishmentPage } from './pages/ReplenishmentPage'
 import { SeniorWorkspacePage } from './pages/SeniorWorkspacePage'
 import { StartPage } from './pages/StartPage'
 import { StockPage } from './pages/StockPage'
+import { SupplierOrderFormationPage } from './pages/SupplierOrderFormationPage'
 import { SupplierOrdersPage } from './pages/SupplierOrdersPage'
 import { SuppliersPage } from './pages/SuppliersPage'
 
@@ -85,6 +86,14 @@ function AnimatedRoutes() {
             element={
               <RequireSenior>
                 <ReplenishmentPage />
+              </RequireSenior>
+            }
+          />
+          <Route
+            path="/orders/forming"
+            element={
+              <RequireSenior>
+                <SupplierOrderFormationPage />
               </RequireSenior>
             }
           />

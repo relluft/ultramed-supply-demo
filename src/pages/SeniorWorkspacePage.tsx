@@ -1,5 +1,4 @@
 import {
-  BarChart3,
   BookOpen,
   ArrowLeft,
   Check,
@@ -9,6 +8,7 @@ import {
   PackageCheck,
   PackagePlus,
   PackageSearch,
+  PackageX,
   Receipt,
   Search,
   ShoppingCart,
@@ -46,25 +46,18 @@ type IssueDraft =
 
 const seniorDashboardGroups = [
   {
-    title: 'Отчеты',
+    title: 'Работа',
     items: [
-      { to: '/stock', label: 'Остатки', caption: 'Текущие количества и минимумы', icon: PackageSearch },
-      { to: '/journal#turnover', label: 'Оборот', caption: 'Движение материалов по журналу', icon: ClipboardList },
-      { to: '/analytics#stock', label: 'Анализ остатков', caption: 'Проблемные позиции и дефицит', icon: BarChart3 },
-      { to: '/analytics#inventory', label: 'Анализ инвентаризации', caption: 'Контроль расхождений', icon: BarChart3 },
+      { to: '/senior#requests', label: 'Заявки', caption: 'Входящие заявки кабинетов и выдача материалов', icon: ClipboardList },
+      { to: '/replenishment', label: 'Пополнение', caption: 'Дефицит после обработки заявки', icon: PackagePlus },
+      { to: '/orders', label: 'Заказы поставщикам', caption: 'Сформировать заказ из пополнения', icon: ShoppingCart },
+      { to: '/receipt', label: 'Приход', caption: 'Принять поставку и обновить склад', icon: Receipt },
     ],
   },
   {
-    title: 'Накладные',
+    title: 'Склад',
     items: [
-      { to: '/orders', label: 'Закупка', caption: 'Сформировать заказы поставщикам', icon: ShoppingCart },
-      { to: '/senior#issue', label: 'Выдача', caption: 'Обработать заявки кабинетов', icon: PackageCheck },
-      { to: '/journal#writeoff', label: 'Списание', caption: 'Посмотреть списания', icon: ClipboardList },
-      { to: '/stock#inventory', label: 'Инвентаризация', caption: 'Проверить фактические остатки', icon: PackageSearch },
-      { to: '/receipt', label: 'Приход', caption: 'Принять поставку на склад', icon: Receipt },
-      { to: '/senior#requests', label: 'Заявки', caption: 'Открыть входящие заявки', icon: ClipboardList },
-      { to: '/journal#sales', label: 'Продажа', caption: 'Операции продаж', icon: Receipt },
-      { to: '/suppliers#settlements', label: 'Расчеты с поставщиками', caption: 'Контроль взаиморасчетов', icon: Truck },
+      { to: '/stock', label: 'Остатки', caption: 'Контроль текущего склада после выдачи и прихода', icon: PackageSearch },
     ],
   },
   {
@@ -72,12 +65,6 @@ const seniorDashboardGroups = [
     items: [
       { to: '/catalog', label: 'Материалы', caption: 'Карточки, упаковки и поставщики', icon: BookOpen },
       { to: '/suppliers', label: 'Поставщики', caption: 'Контакты и условия поставки', icon: Truck },
-    ],
-  },
-  {
-    title: 'Аналитика',
-    items: [
-      { to: '/analytics', label: 'Аналитические отчеты', caption: 'Сводная картина снабжения', icon: BarChart3 },
     ],
   },
 ]
@@ -169,6 +156,7 @@ export function SeniorWorkspacePage() {
     setActiveRequest,
     issueFullLine,
     issuePartialLine,
+    markLineOutOfStock,
     addItemToReplenishment,
   } = useDemo()
   const [query, setQuery] = useState('')
@@ -375,6 +363,28 @@ export function SeniorWorkspacePage() {
       issuePartialLine(selectedRequest.id, lineId, Math.round(Number(draft.quantity) || 0))
     })
     setIssueDrafts({})
+  }
+
+  function prepareAvailableIssue() {
+    if (!selectedRequest) return
+
+    const nextDrafts: Record<string, IssueDraft> = {}
+    selectedRequest.lines.forEach((line) => {
+      if (!line.itemId) return
+
+      const remaining = line.quantity - line.issuedQuantity
+      const available = getStockQuantity(stock, line.itemId)
+      if (remaining <= 0 || available <= 0) return
+
+      if (available >= remaining) {
+        nextDrafts[line.id] = { mode: 'full' }
+        return
+      }
+
+      nextDrafts[line.id] = { mode: 'partial', quantity: String(available) }
+    })
+
+    setIssueDrafts(nextDrafts)
   }
 
   function requestRoom(request: typeof sortedRequests[number]) {
@@ -709,6 +719,14 @@ export function SeniorWorkspacePage() {
                   </div>
                 ) : null}
               </div>
+              {!isRequestOverview && selectedRequest ? (
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <Button variant="secondary" onClick={prepareAvailableIssue}>
+                    <PackageCheck size={16} />
+                    Подготовить выдачу доступного
+                  </Button>
+                </div>
+              ) : null}
             </div>
 
             {isRequestOverview && overviewFiltersOpen ? (
@@ -775,7 +793,7 @@ export function SeniorWorkspacePage() {
             <table className="w-full table-fixed border-separate border-spacing-0">
               <colgroup>
                 <col className="w-[3%]" />
-                <col className="w-[37%]" />
+                <col className="w-[34%]" />
                 <col className="w-[8%]" />
                 <col className="w-[4%]" />
                 <col className="w-[7%]" />
@@ -783,7 +801,7 @@ export function SeniorWorkspacePage() {
                 <col className="w-[8%]" />
                 <col className="w-[5%]" />
                 <col className="w-[7%]" />
-                <col className="w-[15%]" />
+                <col className="w-[18%]" />
               </colgroup>
               <thead>
                 <tr>
@@ -881,7 +899,7 @@ export function SeniorWorkspacePage() {
                       </td>
                       <td className={cn(detailTableCell, '!px-1 whitespace-nowrap')} onClick={(event) => event.stopPropagation()}>
                         {requestLine && selectedRequest ? (
-                          <div className="flex w-full min-w-0 flex-nowrap items-center justify-center gap-1">
+                          <div className="flex w-full min-w-0 flex-wrap items-center justify-center gap-1">
                             <ToolIconButton
                               label={issueDraft?.mode === 'full' ? 'Отмена' : 'Выдать'}
                               icon={issueDraft?.mode === 'full' ? undefined : <Check size={13} strokeWidth={2.2} />}
@@ -916,6 +934,15 @@ export function SeniorWorkspacePage() {
                                 />
                               ) : null}
                             </div>
+                            {shortage > 0 ? (
+                              <ToolIconButton
+                                label={available <= 0 ? 'Нет на складе / В пополнение' : 'Не хватает / В пополнение'}
+                                icon={<PackageX size={13} strokeWidth={2.2} />}
+                                tone="danger"
+                                className="!min-h-5 !px-1.5 py-0 text-[10px]"
+                                onClick={() => markLineOutOfStock(selectedRequest.id, requestLine.id)}
+                              />
+                            ) : null}
                           </div>
                         ) : (
                           <div className="grid w-full min-w-0 grid-cols-1 gap-1.5">

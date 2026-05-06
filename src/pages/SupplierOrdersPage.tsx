@@ -1,39 +1,29 @@
-import { ArrowRight, Clipboard, FileSpreadsheet, Mail, PackageX, Truck } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { ChevronDown, ChevronRight, Truck } from 'lucide-react'
+import { Fragment, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PageTransition } from '../components/PageTransition'
-import { Button, EmptyState, Panel, SectionHeader, StatusPill, tableCell, tableHeaderCell } from '../components/ui'
+import { Button, Panel, SectionHeader } from '../components/ui'
 import { useDemo } from '../context'
-import {
-  availabilityLabels,
-  isReadyForOrder,
-  orderStatusLabels,
-  statusTone,
-} from '../lib/demoLogic'
-import { formatMoney, formatNumber } from '../lib/format'
+import { availabilityLabels, orderStatusLabels } from '../lib/demoLogic'
+import { cn, formatDateTime, formatMoney, formatNumber } from '../lib/format'
+import type { SupplierOrder } from '../types/demo'
+
+const headerCell =
+  'sticky top-0 z-10 h-9 border-b border-r border-slate-200 bg-slate-50 px-2 py-2 text-center text-[11px] font-normal uppercase tracking-wide text-slate-500 last:border-r-0'
+const tableCell = 'h-10 border-b border-r border-slate-100 px-2 py-2 align-middle text-xs leading-4 text-slate-700 last:border-r-0'
+const emptyRows = Array.from({ length: 10 })
 
 export function SupplierOrdersPage() {
   const navigate = useNavigate()
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null)
   const {
-    state: { orders, suppliers, catalog, replenishment, requests },
-    formSupplierOrders,
-    markOrderAsOrdered,
-    selectReplenishmentSupplier,
-    updateReplenishmentAvailability,
+    state: { orders, suppliers, catalog },
   } = useDemo()
-  const [emailOrderId, setEmailOrderId] = useState<string | null>(null)
-  const [excelOrderId, setExcelOrderId] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
-  const manualLines = requests.flatMap((request) =>
-    request.lines
-      .filter((line) => line.manualName && line.status !== 'rejected')
-      .map((line) => ({ request, line })),
-  )
-  const problemReplenishment = replenishment.filter(
-    (line) => !line.closedAt && !isReadyForOrder(line.availabilityStatus),
-  )
 
-  const problemCount = problemReplenishment.length + manualLines.length
+  const orderedHistory = useMemo(
+    () => [...orders].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()),
+    [orders],
+  )
   const orderTotals = useMemo(() => {
     return new Map(
       orders.map((order) => [
@@ -42,225 +32,192 @@ export function SupplierOrdersPage() {
       ]),
     )
   }, [orders])
+  const catalogById = useMemo(() => new Map(catalog.map((item) => [item.id, item])), [catalog])
 
   function supplierName(id: string) {
-    return suppliers.find((supplier) => supplier.id === id)?.name ?? '—'
+    return suppliers.find((supplier) => supplier.id === id)?.name ?? '-'
   }
 
-  function itemName(id: string) {
-    return catalog.find((item) => item.id === id)?.shortName ?? 'Позиция'
+  function orderQuantity(order: SupplierOrder) {
+    return order.lines.reduce((sum, line) => sum + line.quantity, 0)
   }
 
-  function supplierEmail(id: string) {
-    return suppliers.find((supplier) => supplier.id === id)?.email ?? ''
+  function vatAmount(totalWithVat: number) {
+    return totalWithVat ? totalWithVat - totalWithVat / 1.2 : 0
   }
 
-  function buildEmailText(orderId: string) {
-    const order = orders.find((item) => item.id === orderId)
-    if (!order) return ''
-
-    const lines = order.lines
-      .map((line, index) => {
-        const item = catalog.find((candidate) => candidate.id === line.itemId)
-        return `${index + 1}. ${item?.shortName ?? line.itemId} - ${line.quantity} ${item?.unit ?? ''}`
-      })
-      .join('\n')
-
-    return `Добрый день.\n\nПросим подтвердить наличие и счет по заказу ${order.id}:\n${lines}\n\nОтправка письма в демо не выполняется.`
+  function lineStatusLabel(status: SupplierOrder['lines'][number]['status']) {
+    return availabilityLabels[status as keyof typeof availabilityLabels] ?? orderStatusLabels[status as keyof typeof orderStatusLabels] ?? status
   }
 
-  async function copyEmail(orderId: string) {
-    const text = buildEmailText(orderId)
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1800)
-    } catch {
-      setEmailOrderId(orderId)
-    }
-  }
-
-  function handleCreateOrders() {
-    formSupplierOrders()
+  function toggleOrder(orderId: string) {
+    setExpandedOrderId((current) => (current === orderId ? null : orderId))
   }
 
   return (
-    <PageTransition className="grid gap-3">
+    <PageTransition className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
       <Panel>
         <SectionHeader
           title="Заказы поставщикам"
-          subtitle="Строки пополнения группируются по выбранным поставщикам. Email и Excel показаны как честные demo-заглушки."
+          subtitle="Реестр сформированных заказов. Суммы указаны с НДС 20%."
           action={
-            <Button onClick={handleCreateOrders}>
-              Сформировать заказ
+            <Button onClick={() => navigate('/replenishment')}>
+              К пополнению
               <Truck size={16} />
             </Button>
           }
         />
       </Panel>
 
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr),360px]">
-        <section className="grid gap-3">
-          {orders.length ? (
-            orders.map((order) => {
-              const supplier = suppliers.find((item) => item.id === order.supplierId)
-              const total = orderTotals.get(order.id) ?? 0
-              return (
-                <Panel key={order.id} className="overflow-hidden p-0">
-                  <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-xl font-semibold text-slate-950">{order.id}</div>
-                        <StatusPill tone={statusTone(order.status)}>{orderStatusLabels[order.status]}</StatusPill>
-                      </div>
-                      <div className="mt-1 text-sm text-slate-500">
-                        {supplier?.name} · {supplier?.phone} · {supplier?.email}
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <StatusPill>{order.lines.length} позиций</StatusPill>
-                        <StatusPill tone={total ? 'success' : 'warning'}>{total ? formatMoney(total) : 'Есть строки без цены'}</StatusPill>
-                      </div>
-                    </div>
+      <Panel className="min-h-0 overflow-hidden p-0">
+        <div className="h-full overflow-auto">
+          <table className="w-full min-w-[980px] border-separate border-spacing-0">
+            <colgroup>
+              <col className="w-[4%]" />
+              <col className="w-[12%]" />
+              <col className="w-[13%]" />
+              <col className="w-[24%]" />
+              <col className="w-[9%]" />
+              <col className="w-[11%]" />
+              <col className="w-[16%]" />
+              <col className="w-[11%]" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th className={headerCell}></th>
+                <th className={headerCell}>Заказ</th>
+                <th className={headerCell}>Дата</th>
+                <th className={headerCell}>Поставщик</th>
+                <th className={headerCell}>Поз.</th>
+                <th className={headerCell}>Кол-во</th>
+                <th className={headerCell}>Сумма с НДС</th>
+                <th className={headerCell}>НДС 20%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orderedHistory.length
+                ? orderedHistory.map((order, index) => {
+                    const total = orderTotals.get(order.id) ?? 0
+                    const vat = vatAmount(total)
+                    const expanded = expandedOrderId === order.id
 
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="secondary" onClick={() => setExcelOrderId(excelOrderId === order.id ? null : order.id)}>
-                        <FileSpreadsheet size={16} />
-                        Показать Excel
-                      </Button>
-                      <Button variant="secondary" onClick={() => setEmailOrderId(emailOrderId === order.id ? null : order.id)}>
-                        <Mail size={16} />
-                        Показать черновик
-                      </Button>
-                      <Button variant="secondary" onClick={() => copyEmail(order.id)}>
-                        <Clipboard size={16} />
-                        {copied ? 'Скопировано' : 'Скопировать текст email'}
-                      </Button>
-                      <Button onClick={() => markOrderAsOrdered(order.id)} disabled={order.status === 'waiting-receipt' || order.status === 'receipt-accepted'}>
-                        Отметить как заказано
-                      </Button>
-                      <Button variant="ghost" onClick={() => navigate('/receipt')}>
-                        Перейти к приходу
-                        <ArrowRight size={16} />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[860px] border-separate border-spacing-0">
-                      <thead>
-                        <tr>
-                          <th className={tableHeaderCell}>Позиция</th>
-                          <th className={tableHeaderCell}>Количество</th>
-                          <th className={tableHeaderCell}>Цена</th>
-                          <th className={tableHeaderCell}>Сумма</th>
-                          <th className={tableHeaderCell}>Статус</th>
-                          <th className={tableHeaderCell}>Комментарий</th>
+                    return (
+                      <Fragment key={order.id}>
+                        <tr
+                          onClick={() => toggleOrder(order.id)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault()
+                              toggleOrder(order.id)
+                            }
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          aria-expanded={expanded}
+                          className={cn(
+                            'cursor-pointer transition hover:bg-emerald-50/70 focus-visible:bg-emerald-50 focus-visible:outline-none',
+                            expanded ? 'bg-emerald-50/80' : index % 2 ? 'bg-white' : 'bg-slate-50/35',
+                          )}
+                        >
+                          <td className={cn(tableCell, 'text-center text-slate-500')}>
+                            {expanded ? <ChevronDown size={15} className="mx-auto" /> : <ChevronRight size={15} className="mx-auto" />}
+                          </td>
+                          <td className={cn(tableCell, 'font-medium text-slate-950')}>{order.id}</td>
+                          <td className={tableCell}>{formatDateTime(order.createdAt)}</td>
+                          <td className={tableCell}>{supplierName(order.supplierId)}</td>
+                          <td className={cn(tableCell, 'text-center')}>{order.lines.length}</td>
+                          <td className={cn(tableCell, 'text-center')}>{formatNumber(orderQuantity(order))}</td>
+                          <td className={cn(tableCell, 'text-slate-950')}>{total ? formatMoney(total) : '-'}</td>
+                          <td className={tableCell}>{vat ? formatMoney(vat) : '-'}</td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {order.lines.map((line) => {
-                          const item = catalog.find((candidate) => candidate.id === line.itemId)
-                          return (
-                            <tr key={line.id}>
-                              <td className={tableCell}>
-                                <div className="font-semibold text-slate-950">{item?.shortName}</div>
-                                <div className="text-xs text-slate-500">{item?.fullName}</div>
-                              </td>
-                              <td className={tableCell}>{formatNumber(line.quantity)} {item?.unit}</td>
-                              <td className={tableCell}>{line.price ? formatMoney(line.price) : '—'}</td>
-                              <td className={tableCell}>{line.price ? formatMoney(line.price * line.quantity) : '—'}</td>
-                              <td className={tableCell}>
-                                <StatusPill tone={statusTone(line.status)}>{availabilityLabels[line.status as keyof typeof availabilityLabels] ?? orderStatusLabels[line.status as keyof typeof orderStatusLabels]}</StatusPill>
-                              </td>
-                              <td className={tableCell}>{line.comment || '—'}</td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                        {expanded ? (
+                          <tr key={`${order.id}-details`} className="bg-white">
+                            <td colSpan={8} className="border-b border-slate-200 bg-white p-0">
+                              <div className="border-l-4 border-emerald-200 bg-slate-50/60 px-3 py-3">
+                                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                  <div>
+                                    <div className="text-sm font-normal text-slate-950">Детализация заказа {order.id}</div>
+                                    <div className="text-xs text-slate-500">
+                                      {supplierName(order.supplierId)} · {order.lines.length} поз. · итог {total ? formatMoney(total) : '-'}
+                                    </div>
+                                  </div>
+                                  <div className="text-xs text-slate-500">
+                                    Статус: <span className="text-slate-950">{orderStatusLabels[order.status]}</span>
+                                  </div>
+                                </div>
+                                <div className="overflow-auto rounded-md border border-slate-200 bg-white">
+                                  <table className="w-full min-w-[1120px] border-separate border-spacing-0">
+                                    <colgroup>
+                                      <col className="w-[4%]" />
+                                      <col className="w-[32%]" />
+                                      <col className="w-[14%]" />
+                                      <col className="w-[6%]" />
+                                      <col className="w-[7%]" />
+                                      <col className="w-[11%]" />
+                                      <col className="w-[11%]" />
+                                      <col className="w-[8%]" />
+                                      <col className="w-[7%]" />
+                                    </colgroup>
+                                    <thead>
+                                      <tr>
+                                        <th className={headerCell}>№</th>
+                                        <th className={headerCell}>Позиция</th>
+                                        <th className={headerCell}>Упаковка</th>
+                                        <th className={headerCell}>Ед.</th>
+                                        <th className={headerCell}>Кол-во</th>
+                                        <th className={headerCell}>Цена с НДС</th>
+                                        <th className={headerCell}>Сумма с НДС</th>
+                                        <th className={headerCell}>НДС</th>
+                                        <th className={headerCell}>Статус</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {order.lines.map((line, lineIndex) => {
+                                        const item = catalogById.get(line.itemId)
+                                        const price = line.price ?? item?.price ?? 0
+                                        const lineTotal = price * line.quantity
+                                        const lineVat = vatAmount(lineTotal)
 
-                  {excelOrderId === order.id ? (
-                    <div className="border-t border-slate-200 bg-slate-50 p-4 text-sm">
-                      <div className="font-semibold text-slate-950">Demo-Excel: {order.id}.xlsx</div>
-                      <div className="mt-2 grid gap-1 text-slate-600">
-                        {order.lines.map((line) => (
-                          <div key={line.id} className="grid grid-cols-[minmax(0,1fr),80px,100px] gap-2 rounded bg-white px-3 py-2">
-                            <span>{itemName(line.itemId)}</span>
-                            <span>{line.quantity}</span>
-                            <span>{line.price ? formatMoney(line.price) : 'без цены'}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {emailOrderId === order.id ? (
-                    <div className="border-t border-slate-200 bg-slate-50 p-4">
-                      <div className="mb-2 text-sm font-semibold text-slate-950">
-                        Черновик для {supplierEmail(order.supplierId)}. Отправка в демо не выполняется.
-                      </div>
-                      <pre className="whitespace-pre-wrap rounded-md border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-700">
-                        {buildEmailText(order.id)}
-                      </pre>
-                    </div>
-                  ) : null}
-                </Panel>
-              )
-            })
-          ) : (
-            <Panel>
-              <EmptyState>Заказы еще не сформированы. Сначала отметьте наличие в пополнении и нажмите `Сформировать заказ`.</EmptyState>
-            </Panel>
-          )}
-        </section>
-
-        <Panel className="content-start">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <div className="text-lg font-semibold text-slate-950">Проблемные позиции</div>
-              <div className="text-sm text-slate-500">Не входят в обычный заказ без ручного решения.</div>
-            </div>
-            <StatusPill tone={problemCount ? 'danger' : 'success'}>{problemCount}</StatusPill>
-          </div>
-
-          <div className="mt-4 grid gap-2">
-            {problemReplenishment.map((line) => {
-              const item = catalog.find((candidate) => candidate.id === line.itemId)
-              const firstAlternative = item?.alternativeSupplierIds[0]
-              return (
-                <div key={line.id} className="rounded-md border border-slate-200 p-3 text-sm">
-                  <div className="font-semibold text-slate-950">{item?.shortName}</div>
-                  <div className="mt-1 text-slate-500">{availabilityLabels[line.availabilityStatus]}</div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {firstAlternative ? (
-                      <Button variant="secondary" onClick={() => selectReplenishmentSupplier(line.id, firstAlternative)}>
-                        Перенести к альтернативному поставщику
-                      </Button>
-                    ) : null}
-                    <Button
-                      variant="ghost"
-                      onClick={() => updateReplenishmentAvailability(line.id, 'not-available-from-approved-suppliers')}
-                    >
-                      <PackageX size={15} />
-                      Нет у доступных поставщиков
-                    </Button>
-                  </div>
-                </div>
-              )
-            })}
-
-            {manualLines.map(({ request, line }) => (
-              <div key={line.id} className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                <div className="font-semibold">{line.manualName}</div>
-                <div className="mt-1">Ручная строка еще не разобрана · {request.id}</div>
-              </div>
-            ))}
-
-            {!problemCount ? <EmptyState>Проблемных позиций сейчас нет.</EmptyState> : null}
-          </div>
-        </Panel>
-      </div>
+                                        return (
+                                          <tr key={line.id} className={lineIndex % 2 ? 'bg-white' : 'bg-slate-50/40'}>
+                                            <td className={cn(tableCell, 'text-center text-slate-950')}>{lineIndex + 1}</td>
+                                            <td className={tableCell}>
+                                              <div className="whitespace-normal break-words text-slate-950">{item?.fullName ?? 'Позиция'}</div>
+                                              <div className="mt-0.5 text-[10px] leading-3 text-slate-500">{item?.category ?? '-'}</div>
+                                            </td>
+                                            <td className={cn(tableCell, 'break-words')}>{item?.packageLabel ?? '-'}</td>
+                                            <td className={cn(tableCell, 'text-center')}>{item?.unit ?? '-'}</td>
+                                            <td className={cn(tableCell, 'text-center text-slate-950')}>{formatNumber(line.quantity)}</td>
+                                            <td className={cn(tableCell, 'whitespace-nowrap')}>{price ? formatMoney(price) : '-'}</td>
+                                            <td className={cn(tableCell, 'whitespace-nowrap text-slate-950')}>{lineTotal ? formatMoney(lineTotal) : '-'}</td>
+                                            <td className={cn(tableCell, 'whitespace-nowrap')}>{lineVat ? formatMoney(lineVat) : '-'}</td>
+                                            <td className={tableCell}>{lineStatusLabel(line.status)}</td>
+                                          </tr>
+                                        )
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    )
+                  })
+                : emptyRows.map((_, index) => (
+                    <tr key={index} className={index % 2 ? 'bg-white' : 'bg-slate-50/35'} aria-hidden="true">
+                      {Array.from({ length: 8 }).map((__, cellIndex) => (
+                        <td key={cellIndex} className={tableCell}>
+                          &nbsp;
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
     </PageTransition>
   )
 }

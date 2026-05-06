@@ -125,31 +125,49 @@ export function StartPage() {
   }
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[#0f6b55] px-4 py-5 text-[#17362d]">
-      <PageTransition className="relative mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-7xl flex-col items-center justify-center overflow-hidden rounded-[34px] bg-white shadow-[0_36px_90px_rgba(6,52,40,0.28)]">
-        <div className="absolute inset-0 bg-[linear-gradient(135deg,#0f6b55_0%,#2d9172_38%,#f5fbf8_38%,#ffffff_100%)]" />
-        <div className="absolute inset-0 opacity-45 [background-image:linear-gradient(90deg,rgba(255,255,255,0.18)_1px,transparent_1px),linear-gradient(180deg,rgba(255,255,255,0.16)_1px,transparent_1px)] [background-size:42px_42px]" />
-        <div className="absolute left-[-12%] top-[12%] h-[72%] w-[48%] rotate-[-8deg] rounded-[52px] bg-white/12" />
-        <div className="absolute bottom-[-18%] right-[-10%] h-[48%] w-[54%] rotate-[-10deg] rounded-[52px] bg-[#e8f5f0]" />
+    <>
+      <style>{`
+        @keyframes landing-gradient-flow {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+
+        @keyframes landing-sheen {
+          0% { transform: translateX(-42%) skewX(-16deg); opacity: 0.34; }
+          50% { opacity: 0.68; }
+          100% { transform: translateX(42%) skewX(-16deg); opacity: 0.34; }
+        }
+      `}</style>
+      <div className="relative min-h-screen overflow-hidden bg-[#063f36] px-4 py-5 text-[#17362d] [background:linear-gradient(125deg,#052f2b_0%,#0a5749_30%,#11906b_58%,#68d99a_100%)] [background-size:180%_180%] [animation:landing-gradient-flow_16s_ease-in-out_infinite]">
+        <div className="pointer-events-none absolute inset-0 opacity-55 [background-image:linear-gradient(115deg,transparent_0%,rgba(211,255,230,0.18)_30%,transparent_54%,rgba(88,225,151,0.16)_74%,transparent_100%)] [background-size:220%_220%] [animation:landing-gradient-flow_12s_ease-in-out_infinite]" />
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.10)_1px,transparent_1px),linear-gradient(180deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:48px_48px] opacity-45" />
+        <PageTransition className="relative mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-7xl flex-col items-center justify-center overflow-hidden rounded-[34px] border border-white/25 bg-white/95 shadow-[0_42px_120px_rgba(1,43,34,0.38)] backdrop-blur">
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,#073f37_0%,#0d7d60_30%,#32b77e_47%,#f0fbf5_47%,#ffffff_100%)] [background-size:170%_170%] [animation:landing-gradient-flow_18s_ease-in-out_infinite]" />
+        <div className="absolute inset-0 opacity-50 [background-image:linear-gradient(90deg,rgba(255,255,255,0.22)_1px,transparent_1px),linear-gradient(180deg,rgba(255,255,255,0.18)_1px,transparent_1px)] [background-size:42px_42px]" />
+        <div className="absolute left-[-12%] top-[10%] h-[74%] w-[50%] rotate-[-8deg] rounded-[52px] border border-white/10 bg-white/14 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]" />
+        <div className="absolute bottom-[-18%] right-[-10%] h-[48%] w-[54%] rotate-[-10deg] rounded-[52px] bg-[linear-gradient(135deg,#e5fff1_0%,#ffffff_72%)] shadow-[0_24px_80px_rgba(11,100,75,0.12)]" />
+        <div className="pointer-events-none absolute inset-y-[-20%] left-1/2 w-[38%] bg-[linear-gradient(90deg,transparent,rgba(219,255,232,0.22),transparent)] blur-xl [animation:landing-sheen_11s_ease-in-out_infinite]" />
 
         <main className="relative z-10 flex w-full flex-col items-center justify-center px-4">
-          <div className="w-full max-w-3xl rounded-[34px] border border-white bg-white px-6 py-8 shadow-[0_28px_70px_rgba(15,76,60,0.22)] md:px-12 md:py-11">
+          <div className="relative w-full max-w-3xl overflow-hidden rounded-[34px] border border-white/85 bg-white/92 px-6 py-8 shadow-[0_30px_90px_rgba(3,65,49,0.24)] ring-1 ring-[#dcefe7] backdrop-blur-xl md:px-12 md:py-11">
+            <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-[linear-gradient(90deg,transparent,#79e2a6,transparent)]" />
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(229,255,241,0.72)_0%,rgba(255,255,255,0)_48%)]" />
             <img
               src="/brand/ultramed-main-logo.svg"
               alt="УльтраМед"
-              className="mx-auto h-auto w-full max-w-[640px]"
+              className="relative mx-auto h-auto w-full max-w-[640px]"
             />
-            <div className="mx-auto mt-2 max-w-[420px] text-center text-3xl font-normal leading-none text-[#6089bb] md:text-4xl">
+            <div className="relative mx-auto mt-2 max-w-[420px] text-center text-3xl font-normal leading-none text-[#6089bb] md:text-4xl">
               СНАБЖЕНИЕ
             </div>
           </div>
           <button
             type="button"
             onClick={openAuth}
-            className="mt-8 inline-flex min-h-14 min-w-60 items-center justify-center gap-2 rounded-full bg-[#267e63] px-7 text-base font-semibold text-white shadow-[0_18px_34px_rgba(6,80,60,0.28)] transition hover:-translate-y-0.5 hover:bg-[#2d9172] hover:shadow-[0_24px_42px_rgba(6,80,60,0.34)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/60"
+            className="group relative mt-8 inline-flex min-h-14 min-w-60 items-center justify-center gap-2 overflow-hidden rounded-full border border-white/25 bg-[linear-gradient(110deg,#0c6b55_0%,#20a574_42%,#77df9d_100%)] bg-[length:180%_180%] px-7 text-base font-semibold text-white shadow-[0_20px_44px_rgba(3,72,52,0.34)] transition hover:-translate-y-0.5 hover:shadow-[0_28px_54px_rgba(3,72,52,0.42)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/70 [animation:landing-gradient-flow_10s_ease-in-out_infinite]"
           >
             Авторизация
-            <KeyRound size={17} />
+            <KeyRound size={17} className="relative" />
           </button>
         </main>
       </PageTransition>
@@ -169,11 +187,12 @@ export function StartPage() {
               exit={{ opacity: 0, y: 10, scale: 0.98 }}
               transition={{ duration: 0.18 }}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold text-[#17362d]">Выберите пользователя</h2>
-                  <p className="mt-1 text-sm leading-6 text-[#62766f]">
-                    После выбора откроются поля логина и пароля.
+              <div className="grid grid-cols-[40px_minmax(0,1fr)_40px] items-start gap-3">
+                <div />
+                <div className="text-center">
+                  <h2 className="text-xl font-semibold text-[#17362d]">Выберите пользователя</h2>
+                  <p className="mx-auto mt-1 max-w-sm text-sm leading-5 text-[#587367]">
+                    Доступ к разделам системы зависит от выбранной роли.
                   </p>
                 </div>
                 <button
@@ -199,15 +218,21 @@ export function StartPage() {
                       onClick={() => selectRole(item)}
                       disabled={loginStep !== 'idle'}
                       className={cn(
-                        'min-h-32 rounded-[22px] border p-3 text-left transition disabled:pointer-events-none',
+                        'group min-h-32 rounded-[22px] border p-3 text-left transition disabled:pointer-events-none',
                         active
-                          ? 'border-[#70a893] bg-[#eef7f3] text-[#17362d] shadow-sm'
+                          ? 'border-[#70a893] bg-[#eef7f3] text-[#17362d] shadow-[0_14px_26px_rgba(21,58,46,0.10)]'
                           : 'border-[#dce9e3] bg-white text-[#52665f] hover:-translate-y-0.5 hover:border-[#9cc7b6] hover:shadow-[0_18px_28px_rgba(21,58,46,0.10)]',
                       )}
                     >
-                      <Icon size={21} className={active ? 'text-[#267e63]' : 'text-[#6089bb]'} />
-                      <div className="mt-3 font-semibold text-[#17362d]">{profile.title}</div>
-                      <div className="mt-1 text-sm leading-5 text-[#62766f]">{profile.caption}</div>
+                      <div
+                        className={cn(
+                          'flex h-9 w-9 items-center justify-center rounded-xl transition',
+                          active ? 'bg-white text-[#267e63]' : 'bg-[#f4fbf8] text-[#6089bb] group-hover:bg-[#eef7f3] group-hover:text-[#267e63]',
+                        )}
+                      >
+                        <Icon size={20} />
+                      </div>
+                      <div className="mt-3 text-base font-semibold leading-5 text-[#17362d]">{profile.title}</div>
                     </button>
                   )
                 })}
@@ -271,6 +296,7 @@ export function StartPage() {
           </motion.div>
         ) : null}
       </AnimatePresence>
-    </div>
+      </div>
+    </>
   )
 }

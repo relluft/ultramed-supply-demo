@@ -5,7 +5,7 @@ export function buttonStyles(
   variant: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success' = 'primary',
 ) {
   return cn(
-    'inline-flex min-h-9 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/20 disabled:pointer-events-none disabled:opacity-45',
+    'inline-flex min-h-9 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-normal transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/20 disabled:pointer-events-none disabled:opacity-45',
     variant === 'primary' && 'border border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800',
     variant === 'secondary' && 'border border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50',
     variant === 'ghost' && 'border border-transparent bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-950',
@@ -41,7 +41,7 @@ export function SectionHeader({
   return (
     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-950">{title}</h1>
+        <h1 className="text-2xl font-normal text-slate-950">{title}</h1>
         {subtitle ? <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{subtitle}</p> : null}
       </div>
       {action ? <div className="flex shrink-0 flex-wrap gap-2">{action}</div> : null}
@@ -68,7 +68,7 @@ export function StatusPill({
   return (
     <span
       className={cn(
-        'inline-flex min-h-6 items-center justify-center rounded-md border px-2 py-0.5 text-xs font-semibold',
+        'inline-flex min-h-6 items-center justify-center rounded-md border px-2 py-0.5 text-xs font-normal',
         classes,
         className,
       )}
@@ -90,6 +90,6 @@ export const fieldStyles =
   'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10'
 
 export const tableHeaderCell =
-  'border-b border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500'
+  'border-b border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-normal uppercase tracking-wide text-slate-500'
 
 export const tableCell = 'border-b border-slate-100 px-3 py-2 align-top text-sm text-slate-700'

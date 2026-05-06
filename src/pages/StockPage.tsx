@@ -4,8 +4,8 @@ import { PageTransition } from '../components/PageTransition'
 import { Button, EmptyState, Panel, SectionHeader, StatusPill, tableCell, tableHeaderCell } from '../components/ui'
 import { useDemo } from '../context'
 import { getStockQuantity, getStockStatus, stockStatusLabels, statusTone } from '../lib/demoLogic'
-import { formatDateTime, formatNumber } from '../lib/format'
-import type { CatalogItem } from '../types/demo'
+import { cn, formatDateTime, formatNumber } from '../lib/format'
+import type { CatalogItem, StockStatus } from '../types/demo'
 
 export function StockPage() {
   const {
@@ -13,7 +13,88 @@ export function StockPage() {
     addItemToReplenishment,
   } = useDemo()
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
-  const activeCatalog = catalog.filter((item) => item.active)
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | StockStatus>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const stockByItemId = useMemo(() => new Map(stock.map((item) => [item.itemId, item])), [stock])
+  const categories = useMemo(
+    () => Array.from(new Set(catalog.filter((item) => item.active).map((item) => item.category))).sort((left, right) => left.localeCompare(right, 'ru')),
+    [catalog],
+  )
+  const warehouseRows = useMemo(() => {
+    const statusRank: Record<StockStatus, number> = {
+      'out-of-stock': 0,
+      'below-minimum': 1,
+      'near-minimum': 2,
+      'waiting-receipt': 3,
+      enough: 4,
+    }
+
+    const normalizedSearch = searchQuery.trim().toLowerCase()
+
+    return catalog
+      .filter((item) => item.active)
+      .map((item) => {
+        const stockRecord = stockByItemId.get(item.id)
+        const status = getStockStatus(item, stock, replenishment)
+
+        return {
+          item,
+          stockRecord,
+          quantity: stockRecord?.quantity ?? 0,
+          status,
+          shortageToMin: Math.max(item.minStock - (stockRecord?.quantity ?? 0), 0),
+          shortageToDesired: Math.max(item.desiredStock - (stockRecord?.quantity ?? 0), 0),
+        }
+      })
+      .filter((row) => categoryFilter === 'all' || row.item.category === categoryFilter)
+      .filter((row) => statusFilter === 'all' || row.status === statusFilter)
+      .filter((row) => {
+        if (!normalizedSearch) return true
+
+        const primarySupplier = supplierName(row.item.primarySupplierId)
+        const alternativeSuppliers = row.item.alternativeSupplierIds.map(supplierName).join(' ')
+        return [
+          row.item.shortName,
+          row.item.fullName,
+          row.item.category,
+          row.item.packageLabel,
+          primarySupplier,
+          alternativeSuppliers,
+          ...row.item.searchSynonyms,
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(normalizedSearch)
+      })
+      .sort(
+        (left, right) =>
+          statusRank[left.status] - statusRank[right.status] ||
+          left.item.category.localeCompare(right.item.category, 'ru') ||
+          left.item.shortName.localeCompare(right.item.shortName, 'ru'),
+      )
+  }, [catalog, categoryFilter, replenishment, searchQuery, statusFilter, stock, stockByItemId, suppliers])
+  const allWarehouseRows = useMemo(
+    () =>
+      catalog
+        .filter((item) => item.active)
+        .map((item) => ({
+          item,
+          status: getStockStatus(item, stock, replenishment),
+          quantity: stockByItemId.get(item.id)?.quantity ?? 0,
+        })),
+    [catalog, replenishment, stock, stockByItemId],
+  )
+  const stockMetrics = useMemo(
+    () => ({
+      total: allWarehouseRows.length,
+      enough: allWarehouseRows.filter((row) => row.status === 'enough').length,
+      attention: allWarehouseRows.filter((row) => row.status === 'near-minimum' || row.status === 'below-minimum').length,
+      out: allWarehouseRows.filter((row) => row.status === 'out-of-stock').length,
+      quantity: allWarehouseRows.reduce((sum, row) => sum + row.quantity, 0),
+    }),
+    [allWarehouseRows],
+  )
   const selectedItem = selectedItemId ? catalog.find((item) => item.id === selectedItemId) : null
   const movementEvents = useMemo(() => {
     if (!selectedItem) return []
@@ -28,12 +109,80 @@ export function StockPage() {
     <PageTransition className="grid gap-3">
       <Panel>
         <SectionHeader
-          title="Склад"
-          subtitle="Остатки рядом с минимумами, желательным уровнем и поставщиками. Позиция на минимуме подсвечивается как зона внимания."
+          title="Остатки"
+          subtitle="Полная складская ведомость по всем активным позициям справочника материалов: остаток, минимум, желательный уровень и поставщики."
+          action={
+            <>
+              <StatusPill tone="neutral">{stockMetrics.total} позиций</StatusPill>
+              <StatusPill tone="success">{stockMetrics.enough} в норме</StatusPill>
+              <StatusPill tone="warning">{stockMetrics.attention} требуют внимания</StatusPill>
+              {stockMetrics.out ? <StatusPill tone="danger">{stockMetrics.out} нет на складе</StatusPill> : null}
+            </>
+          }
         />
       </Panel>
 
       <Panel className="overflow-hidden p-0">
+        <div className="grid gap-2 border-b border-slate-200 bg-slate-50/70 px-3 py-2 md:grid-cols-[1fr_1fr_1.2fr_1fr_1fr_auto]">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-slate-500">Всего позиций</div>
+            <div className="text-lg font-normal text-slate-950">{formatNumber(stockMetrics.total)}</div>
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-slate-500">Единиц на складе</div>
+            <div className="text-lg font-normal text-slate-950">{formatNumber(stockMetrics.quantity)}</div>
+          </div>
+          <label className="grid gap-1 text-xs text-slate-500">
+            Категория
+            <select
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
+            >
+              <option value="all">Все категории</option>
+              {categories.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs text-slate-500">
+            Поиск
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Название, упаковка, поставщик"
+              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
+            />
+          </label>
+          <label className="grid gap-1 text-xs text-slate-500">
+            Состояние
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as 'all' | StockStatus)}
+              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
+            >
+              <option value="all">Все состояния</option>
+              <option value="enough">Достаточно</option>
+              <option value="near-minimum">Близко к минимуму</option>
+              <option value="below-minimum">Ниже минимума</option>
+              <option value="out-of-stock">Нет на складе</option>
+              <option value="waiting-receipt">Ожидается приход</option>
+            </select>
+          </label>
+          <div className="flex items-end">
+            <Button
+              variant="ghost"
+              className="min-h-8 px-2 py-1 text-xs"
+              onClick={() => {
+                setCategoryFilter('all')
+                setStatusFilter('all')
+                setSearchQuery('')
+              }}
+            >
+              Сбросить
+            </Button>
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1120px] border-separate border-spacing-0">
             <thead>
@@ -52,11 +201,20 @@ export function StockPage() {
               </tr>
             </thead>
             <tbody>
-              {activeCatalog.map((item) => {
-                const stockRecord = stock.find((candidate) => candidate.itemId === item.id)
-                const status = getStockStatus(item, stock, replenishment)
+              {warehouseRows.map((row, index) => {
+                const { item, stockRecord, status } = row
                 return (
-                  <tr key={item.id} className="hover:bg-slate-50">
+                  <tr
+                    key={item.id}
+                    className={cn(
+                      'transition hover:bg-slate-100/70',
+                      status === 'out-of-stock' && 'bg-rose-50/90 hover:bg-rose-100/70',
+                      status === 'below-minimum' && 'bg-red-50/80 hover:bg-red-100/70',
+                      status === 'near-minimum' && 'bg-amber-50/80 hover:bg-amber-100/70',
+                      status === 'waiting-receipt' && 'bg-sky-50/80 hover:bg-sky-100/70',
+                      status === 'enough' && (index % 2 ? 'bg-white' : 'bg-slate-50/35'),
+                    )}
+                  >
                     <td className={tableCell}>
                       <button
                         type="button"
@@ -70,16 +228,25 @@ export function StockPage() {
                     <td className={tableCell}>{item.category}</td>
                     <td className={tableCell}>
                       <span className={status === 'below-minimum' || status === 'out-of-stock' ? 'font-semibold text-rose-700' : 'font-semibold text-slate-950'}>
-                        {formatNumber(stockRecord?.quantity ?? 0)}
+                        {formatNumber(row.quantity)}
                       </span>
                     </td>
-                    <td className={tableCell}>{item.minStock}</td>
-                    <td className={tableCell}>{item.desiredStock}</td>
+                    <td className={tableCell}>{formatNumber(item.minStock)}</td>
+                    <td className={tableCell}>{formatNumber(item.desiredStock)}</td>
                     <td className={tableCell}>{item.unit}</td>
                     <td className={tableCell}>{supplierName(item.primarySupplierId)}</td>
                     <td className={tableCell}>{item.alternativeSupplierIds.map(supplierName).join(', ') || '—'}</td>
                     <td className={tableCell}>
                       <StatusPill tone={statusTone(status)}>{stockStatusLabels[status]}</StatusPill>
+                      {row.shortageToMin ? (
+                        <div className="mt-1 text-[10px] leading-3 text-rose-600">
+                          до мин.: {formatNumber(row.shortageToMin)}
+                        </div>
+                      ) : row.shortageToDesired ? (
+                        <div className="mt-1 text-[10px] leading-3 text-slate-400">
+                          до жел.: {formatNumber(row.shortageToDesired)}
+                        </div>
+                      ) : null}
                     </td>
                     <td className={tableCell}>{stockRecord?.lastMovementAt ? formatDateTime(stockRecord.lastMovementAt) : '—'}</td>
                     <td className={tableCell}>

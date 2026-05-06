@@ -1,70 +1,264 @@
-import { ChevronDown, ChevronRight, ClipboardList, Home, Plus, Search, Trash2, X } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, ClipboardList, Home, Plus, Search, Trash2, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { PageTransition } from '../components/PageTransition'
 import { Button, EmptyState, Panel, SectionHeader, StatusPill, fieldStyles } from '../components/ui'
 import { useDemo } from '../context'
-import { getRoomByRole, requestStatusLabels, roleToRoomId, statusTone } from '../lib/demoLogic'
+import { getRoomByRole, requestLineStatusLabels, requestStatusLabels, roleToRoomId, statusTone } from '../lib/demoLogic'
 import { cn, formatDateTime, formatNumber } from '../lib/format'
-import type { CatalogItem, RequestCartLine, Room } from '../types/demo'
+import type { CatalogItem, RequestCartLine, Room, SupplyRequest, SupplyRequestLine } from '../types/demo'
 
 const orthodonticDemoRequestId = 'REQ-005'
 const requestTableHeaderCell =
-  'sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-500'
+  'sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-left text-[10px] font-normal uppercase tracking-wide text-slate-500'
 const requestTableCell = 'border-b border-slate-100 border-r border-slate-100 px-2 py-1 align-middle text-xs leading-4 text-slate-700 last:border-r-0'
 
 const catalogVariantGroups = [
   {
     id: 'gloves-nitrile',
-    title: 'Перчатки нитриловые неопудренные',
+    title: 'Перчатки смотровые нитриловые неопудренные нестерильные',
     note: 'размеры S / M / L',
     itemIds: ['item-gloves-s', 'item-gloves-m', 'item-gloves-l'],
   },
   {
+    id: 'gloves-latex',
+    title: 'Перчатки смотровые латексные неопудренные нестерильные',
+    note: 'размеры S / M / L',
+    itemIds: ['item-latex-gloves-s', 'item-latex-gloves-m', 'item-latex-gloves-l'],
+  },
+  {
     id: 'gloves-surgical',
-    title: 'Перчатки хирургические стерильные',
-    note: 'размеры 7.0 / 7.5',
-    itemIds: ['item-sterile-gloves-7', 'item-sterile-gloves-75'],
+    title: 'Перчатки хирургические латексные стерильные',
+    note: 'размеры 6.5 / 7.0 / 7.5 / 8.0',
+    itemIds: ['item-sterile-gloves-65', 'item-sterile-gloves-7', 'item-sterile-gloves-75', 'item-sterile-gloves-80'],
+  },
+  {
+    id: 'procedure-masks',
+    title: 'Маски медицинские процедурные трехслойные',
+    note: 'класс защиты и тип крепления',
+    itemIds: ['item-masks', 'item-masks-blue', 'item-masks-black'],
+  },
+  {
+    id: 'respirators',
+    title: 'Респираторы медицинские фильтрующие',
+    note: 'класс защиты и клапан',
+    itemIds: ['item-ffp2-respirators', 'item-ffp2-respirators-valve', 'item-ffp3-respirators'],
+  },
+  {
+    id: 'saliva-ejectors',
+    title: 'Слюноотсосы стоматологические',
+    note: 'наконечник и жесткость каркаса',
+    itemIds: ['item-saliva-ejectors', 'item-saliva-ejectors-blue', 'item-saliva-ejectors-transparent'],
+  },
+  {
+    id: 'air-water-tips',
+    title: 'Насадки одноразовые для пустера стоматологические',
+    note: 'тип адаптера',
+    itemIds: ['item-air-water-tips', 'item-air-water-tips-clear', 'item-air-water-tips-colored'],
+  },
+  {
+    id: 'cotton-rolls',
+    title: 'Валики ватные стоматологические',
+    note: 'размеры 1 / 2 / 3',
+    itemIds: ['item-cotton-rolls-size-1', 'item-cotton-rolls', 'item-cotton-rolls-size-3'],
+  },
+  {
+    id: 'cartridge-needles',
+    title: 'Иглы карпульные стоматологические',
+    note: 'длина и диаметр',
+    itemIds: ['item-needles-27g-long', 'item-needles-27g-short', 'item-needles-30g-long', 'item-needles-30g', 'item-needles-30g-extra-short'],
+  },
+  {
+    id: 'cofferdam-sheets',
+    title: 'Коффердам стоматологический в платках',
+    note: 'толщина и материал',
+    itemIds: ['item-cofferdam-thin-blue', 'item-cofferdam', 'item-cofferdam-heavy-green', 'item-cofferdam-nonlatex-medium'],
   },
   {
     id: 'sterilization-pouches',
-    title: 'Пакеты для стерилизации',
+    title: 'Пакеты самоклеящиеся для стерилизации инструментов',
     note: 'разные размеры пакетов',
-    itemIds: ['item-sterilization-pouches-57', 'item-sterilization-pouches', 'item-sterilization-pouches-135'],
+    itemIds: ['item-sterilization-pouches-57', 'item-sterilization-pouches-75', 'item-sterilization-pouches', 'item-sterilization-pouches-135'],
   },
   {
     id: 'composites',
-    title: 'Композиты стоматологические',
-    note: 'оттенки и консистенции',
-    itemIds: ['item-composite-a2', 'item-composite-a3', 'item-flow-composite-a2', 'item-flow-composite-a3'],
+    title: 'Композиты стоматологические фотополимерные',
+    note: 'консистенция, опаковость и оттенок',
+    itemIds: ['item-composite-a2', 'item-composite-a3', 'item-composite-bulk-a2', 'item-composite-opaque-a2', 'item-flow-composite-a2', 'item-flow-composite-a3'],
+  },
+  {
+    id: 'microbrushes',
+    title: 'Микроаппликаторы стоматологические одноразовые',
+    note: 'размер рабочей головки',
+    itemIds: ['item-microbrushes', 'item-microbrushes-fine', 'item-microbrushes-superfine'],
   },
   {
     id: 'burs',
     title: 'Боры стоматологические',
-    note: 'форма и материал',
-    itemIds: ['item-burs-diamond-round', 'item-burs-diamond-flame', 'item-carbide-burs'],
+    note: 'форма, материал и зернистость',
+    itemIds: ['item-burs-diamond-round', 'item-burs-diamond-round-coarse', 'item-burs-diamond-flame', 'item-burs-diamond-cone-fine', 'item-carbide-burs'],
+  },
+  {
+    id: 'prophy-pastes',
+    title: 'Пасты профилактические полировочные стоматологические',
+    note: 'абразивность и наличие фтора',
+    itemIds: ['item-prophy-paste', 'item-prophy-paste-mint-medium', 'item-prophy-paste-berry-fine'],
+  },
+  {
+    id: 'prophy-tools',
+    title: 'Полировочные чашечки резиновые для профилактики',
+    note: 'жесткость и рабочий рельеф',
+    itemIds: ['item-prophy-cups', 'item-prophy-cups-hard', 'item-prophy-cups-ribbed'],
+  },
+  {
+    id: 'prophy-brushes',
+    title: 'Профилактические щетки стоматологические одноразовые',
+    note: 'форма рабочей части',
+    itemIds: ['item-brushes', 'item-prophy-brushes-pointed', 'item-prophy-brushes-flat'],
+  },
+  {
+    id: 'polishing-discs',
+    title: 'Диски полировочные стоматологические абразивные',
+    note: 'набор и зернистость',
+    itemIds: ['item-disc-4181', 'item-disc-4191', 'item-disc-coarse', 'item-disc-fine'],
+  },
+  {
+    id: 'polishing-strips',
+    title: 'Штрипсы полировочные абразивные межзубные',
+    note: 'зернистость',
+    itemIds: ['item-polishing-strips', 'item-polishing-strips-fine', 'item-polishing-strips-coarse'],
+  },
+  {
+    id: 'sutures',
+    title: 'Шовный материал хирургический стерильный',
+    note: 'размеры 4-0 / 5-0 / 6-0',
+    itemIds: ['item-suture-4-0', 'item-suture-5-0', 'item-suture-6-0'],
+  },
+  {
+    id: 'scalpel-blades',
+    title: 'Лезвия скальпеля стерильные одноразовые',
+    note: 'номера лезвий',
+    itemIds: ['item-scalpel-blades-11', 'item-scalpel-blades-12', 'item-scalpel-blades-15', 'item-scalpel-blades-15c'],
+  },
+  {
+    id: 'sterile-gauze',
+    title: 'Салфетки марлевые стерильные',
+    note: 'размер салфетки',
+    itemIds: ['item-sterile-gauze', 'item-sterile-gauze-75', 'item-sterile-gauze-10'],
   },
   {
     id: 'archwires',
-    title: 'Дуги ортодонтические',
+    title: 'Дуги ортодонтические металлические',
     note: 'материал и размер',
-    itemIds: ['item-niti-archwires', 'item-steel-archwires'],
+    itemIds: ['item-niti-archwires', 'item-niti-archwires-016', 'item-thermal-niti-archwires', 'item-steel-archwires'],
   },
   {
-    id: 'disinfection-products',
-    title: 'Средства дезинфекции',
-    note: 'инструменты, поверхности, руки',
-    itemIds: ['item-disinfectant-instruments', 'item-disinfectant-surfaces', 'item-hand-antiseptic'],
+    id: 'ortho-ligatures',
+    title: 'Лигатуры эластические ортодонтические',
+    note: 'эластичность и фрикционные свойства',
+    itemIds: ['item-elastic-ligatures', 'item-elastic-ligatures-colored', 'item-elastic-ligatures-grey'],
   },
   {
-    id: 'barrier-consumables',
-    title: 'Одноразовые барьерные расходники',
-    note: 'для пациента и установки',
-    itemIds: ['item-bibs', 'item-cups-disposable', 'item-barrier-film', 'item-headrest-covers', 'item-tray-covers'],
+    id: 'ortho-elastics',
+    title: 'Эластики межчелюстные ортодонтические',
+    note: 'сила тяги',
+    itemIds: ['item-ortho-elastics-light', 'item-ortho-elastics', 'item-ortho-elastics-heavy'],
+  },
+  {
+    id: 'elastic-chain',
+    title: 'Эластическая цепочка ортодонтическая',
+    note: 'закрытая, короткое и длинное звено',
+    itemIds: ['item-elastic-chain', 'item-elastic-chain-short', 'item-elastic-chain-long'],
+  },
+  {
+    id: 'retraction-cords',
+    title: 'Ретракционная нить стоматологическая',
+    note: 'размеры 00 / 0 / 1',
+    itemIds: ['item-retraction-cord-00', 'item-retraction-cord-0', 'item-retraction-cord-1'],
+  },
+  {
+    id: 'articulating-paper',
+    title: 'Артикуляционная бумага стоматологическая',
+    note: 'толщина и форма листа',
+    itemIds: ['item-articulating-paper', 'item-articulating-paper-red', 'item-articulating-paper-horseshoe'],
+  },
+  {
+    id: 'instrument-disinfectants',
+    title: 'Концентраты для дезинфекции инструментов',
+    note: 'объем и тип состава',
+    itemIds: ['item-disinfectant-instruments', 'item-disinfectant-instruments-5l', 'item-disinfectant-instruments-enzymatic'],
+  },
+  {
+    id: 'surface-disinfectants',
+    title: 'Средства для дезинфекции поверхностей',
+    note: 'объем флакона или канистры',
+    itemIds: ['item-disinfectant-surfaces', 'item-disinfectant-surfaces-1l', 'item-disinfectant-surfaces-5l'],
+  },
+  {
+    id: 'surface-wipes',
+    title: 'Салфетки дезинфицирующие для поверхностей',
+    note: 'банка, блок, спиртовые',
+    itemIds: ['item-surface-wipes', 'item-surface-wipes-refill', 'item-surface-wipes-alcohol'],
+  },
+  {
+    id: 'hand-antiseptics',
+    title: 'Антисептик кожный спиртовой для обработки рук',
+    note: '500 мл / 1 л / 5 л',
+    itemIds: ['item-hand-antiseptic-500', 'item-hand-antiseptic', 'item-hand-antiseptic-5l'],
+  },
+  {
+    id: 'bibs',
+    title: 'Салфетки-нагрудники стоматологические одноразовые',
+    note: 'слойность и влагозащита',
+    itemIds: ['item-bibs', 'item-bibs-blue', 'item-bibs-green'],
+  },
+  {
+    id: 'disposable-cups',
+    title: 'Стаканчики одноразовые стоматологические',
+    note: 'объем',
+    itemIds: ['item-cups-disposable', 'item-cups-180-white', 'item-cups-200-blue'],
+  },
+  {
+    id: 'barrier-film',
+    title: 'Барьерная пленка для стоматологической установки',
+    note: 'размер листа и перфорация',
+    itemIds: ['item-barrier-film', 'item-barrier-film-clear', 'item-barrier-film-blue'],
+  },
+  {
+    id: 'headrest-covers',
+    title: 'Чехлы одноразовые на подголовник стоматологического кресла',
+    note: 'размер чехла',
+    itemIds: ['item-headrest-covers', 'item-headrest-covers-small', 'item-headrest-covers-large'],
+  },
+  {
+    id: 'tray-covers',
+    title: 'Покрытия одноразовые для стоматологического лотка',
+    note: 'размер покрытия',
+    itemIds: ['item-tray-covers', 'item-tray-covers-small', 'item-tray-covers-large'],
   },
 ]
 
 const catalogGroupByItemId = new Map(catalogVariantGroups.flatMap((group) => group.itemIds.map((itemId) => [itemId, group] as const)))
+const catalogGroupRank = new Map(catalogVariantGroups.map((group, index) => [group.id, index]))
+const catalogCategoryRank = new Map(
+  ['Расходники', 'Анестезия', 'Изоляция', 'Терапия', 'Хирургия', 'Гигиена', 'Дезинфекция', 'Ортопедия', 'Ортодонтия'].map(
+    (category, index) => [category, index],
+  ),
+)
+const frequentItemIdsByRoomId: Record<string, string[]> = {
+  'room-101': ['item-gloves-m', 'item-masks', 'item-saliva-ejectors', 'item-cotton-rolls', 'item-cofferdam', 'item-composite-a2'],
+  'room-102': ['item-sterile-gloves-7', 'item-masks', 'item-sterile-gauze', 'item-suture-4-0', 'item-scalpel-blades-15', 'item-chlorhexidine'],
+  'room-105': ['item-gloves-m', 'item-masks', 'item-niti-archwires', 'item-elastic-ligatures', 'item-ortho-wax', 'item-ortho-elastics', 'item-elastic-chain'],
+}
+
+function catalogSortRank(item: CatalogItem) {
+  const group = catalogGroupByItemId.get(item.id)
+  return {
+    category: catalogCategoryRank.get(item.category) ?? 999,
+    group: group ? catalogGroupRank.get(group.id) ?? 999 : 999,
+    name: item.shortName,
+  }
+}
 
 function matchesQuery(item: CatalogItem, query: string) {
   const value = query.trim().toLowerCase()
@@ -88,19 +282,96 @@ function matchesGroupQuery(group: CatalogVariantGroup, query: string) {
   return [group.title, group.note].join(' ').toLowerCase().includes(value)
 }
 
+function catalogItemProfessionalName(item: CatalogItem) {
+  return item.fullName.trim() || item.shortName
+}
+
 function getGroupCategoryLabel(items: CatalogItem[]) {
   const categories = Array.from(new Set(items.map((item) => item.category)))
   return categories.length === 1 ? categories[0] : `${categories.length} раздела`
 }
 
+function requestIssueSummary(request: { status: string; lines: { quantity: number; issuedQuantity: number; status: string }[] }) {
+  if (request.status === 'sent' || request.status === 'in-review') {
+    return { tone: 'info' as const, label: 'Ожидает обработки' }
+  }
+
+  const pendingLines = request.lines.filter((line) => line.status !== 'rejected' && line.issuedQuantity < line.quantity)
+  const partialLines = pendingLines.filter((line) => line.issuedQuantity > 0)
+  const notIssuedLines = pendingLines.filter((line) => line.issuedQuantity <= 0)
+
+  if (!pendingLines.length) {
+    return { tone: 'success' as const, label: 'Выдано полностью' }
+  }
+
+  if (partialLines.length && notIssuedLines.length) {
+    return { tone: 'warning' as const, label: `Частично: ${partialLines.length}, не выдано: ${notIssuedLines.length}` }
+  }
+
+  if (partialLines.length) {
+    return { tone: 'warning' as const, label: `Выдано частично: ${partialLines.length}` }
+  }
+
+  return { tone: 'danger' as const, label: `Не выдано: ${notIssuedLines.length}` }
+}
+
+function requestDisplayTitle(request: SupplyRequest, catalog: CatalogItem[], room?: Room) {
+  if (request.roomId === 'room-105') return 'Ортодонтия май расходники'
+
+  const title = request.title?.trim().replace(/_/g, ' ')
+  const looksLikeGeneratedItemList = Boolean(
+    title &&
+      ((title.includes(',') && /\+\s*\d+$/.test(title)) ||
+        catalog.some((item) => title.includes(item.shortName) || title.includes(item.fullName))),
+  )
+
+  if (title && !looksLikeGeneratedItemList) return title
+
+  const firstLabels = request.lines
+    .slice(0, 3)
+    .map((line) => {
+      const item = line.itemId ? catalog.find((candidate) => candidate.id === line.itemId) : undefined
+      return item ? catalogItemProfessionalName(item) : line.manualName
+    })
+    .filter(Boolean)
+
+  const suffix = request.lines.length > firstLabels.length ? ` + ${request.lines.length - firstLabels.length}` : ''
+  const base = firstLabels.length ? `${firstLabels.join(', ')}${suffix}` : 'заявка на материалы'
+  return title && looksLikeGeneratedItemList ? 'Ортодонтия май расходники' : `${room?.title ?? 'Кабинет'}: ${base}`
+}
+
+function requestLineIssueStatus(line: SupplyRequestLine, isProcessed: boolean) {
+  const missingQuantity = Math.max(line.quantity - line.issuedQuantity, 0)
+
+  if (!isProcessed) {
+    return { tone: 'info' as const, label: requestLineStatusLabels[line.status], rowClassName: '' }
+  }
+
+  if (missingQuantity <= 0) {
+    return { tone: 'success' as const, label: 'Выдано', rowClassName: 'bg-emerald-50/70' }
+  }
+
+  if (line.issuedQuantity > 0) {
+    return { tone: 'warning' as const, label: 'Выдано частично', rowClassName: 'bg-amber-50' }
+  }
+
+  if (line.status === 'manual-line' || line.status === 'needs-clarification') {
+    return { tone: 'danger' as const, label: requestLineStatusLabels[line.status], rowClassName: 'bg-rose-50' }
+  }
+
+  return { tone: 'danger' as const, label: 'Не выдано', rowClassName: 'bg-rose-50' }
+}
+
 function ManualItemModal({
+  initialName = '',
   onClose,
   onAdd,
 }: {
+  initialName?: string
   onClose: () => void
   onAdd: (name: string, quantity: number, comment: string) => void
 }) {
-  const [name, setName] = useState('')
+  const [name, setName] = useState(initialName)
   const [quantity, setQuantity] = useState(2)
   const [comment, setComment] = useState('')
 
@@ -109,7 +380,7 @@ function ManualItemModal({
       <div className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-4 shadow-xl">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-lg font-semibold text-slate-950">Позиция не найдена</div>
+            <div className="text-lg font-normal text-slate-950">Позиция не найдена</div>
             <div className="mt-1 text-sm text-slate-500">Строка попадет в очередь разбора справочника.</div>
           </div>
           <button
@@ -123,7 +394,7 @@ function ManualItemModal({
         </div>
 
         <div className="mt-4 grid gap-3">
-          <label className="text-sm font-semibold text-slate-700">
+          <label className="text-sm font-normal text-slate-700">
             Текст позиции
             <input
               value={name}
@@ -132,7 +403,7 @@ function ManualItemModal({
               placeholder="Насадка для нового наконечника"
             />
           </label>
-          <label className="text-sm font-semibold text-slate-700">
+          <label className="text-sm font-normal text-slate-700">
             Количество
             <input
               type="number"
@@ -142,7 +413,7 @@ function ManualItemModal({
               className={`mt-1 ${fieldStyles}`}
             />
           </label>
-          <label className="text-sm font-semibold text-slate-700">
+          <label className="text-sm font-normal text-slate-700">
             Комментарий
             <textarea
               value={comment}
@@ -197,7 +468,7 @@ function RequestPreviewModal({
       <div className="flex max-h-full w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
           <div>
-            <div className="text-xl font-semibold text-slate-950">Проверка заявки перед отправкой</div>
+            <div className="text-xl font-normal text-slate-950">Проверка заявки перед отправкой</div>
             <div className="mt-1 text-sm text-slate-500">Проверьте состав и подтвердите отправку старшей медсестре.</div>
           </div>
           <button
@@ -213,30 +484,30 @@ function RequestPreviewModal({
         <div className="min-h-0 overflow-auto px-5 py-4">
           <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-sm md:grid-cols-2 xl:grid-cols-4">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Кабинет</div>
-              <div className="mt-1 font-semibold text-slate-950">{room ? `${room.number} · ${room.title}` : 'Кабинет не выбран'}</div>
+              <div className="text-xs font-normal uppercase tracking-wide text-slate-400">Кабинет</div>
+              <div className="mt-1 font-normal text-slate-950">{room ? `${room.number} · ${room.title}` : 'Кабинет не выбран'}</div>
               <div className="mt-0.5 text-xs text-slate-500">{room?.type}</div>
             </div>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Ответственный</div>
-              <div className="mt-1 font-semibold text-slate-950">{room?.nurseName ?? 'Не указан'}</div>
+              <div className="text-xs font-normal uppercase tracking-wide text-slate-400">Ответственный</div>
+              <div className="mt-1 font-normal text-slate-950">{room?.nurseName ?? 'Не указан'}</div>
               <div className="mt-0.5 text-xs text-slate-500">Отправка старшей медсестре</div>
             </div>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Состав</div>
-              <div className="mt-1 font-semibold text-slate-950">Строк: {cart.length}</div>
+              <div className="text-xs font-normal uppercase tracking-wide text-slate-400">Состав</div>
+              <div className="mt-1 font-normal text-slate-950">Строк: {cart.length}</div>
               <div className="mt-0.5 text-xs text-slate-500">Из справочника: {knownCount}, ручных: {manualCount}</div>
             </div>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Дата формирования</div>
-              <div className="mt-1 font-semibold text-slate-950">{createdAt}</div>
+              <div className="text-xs font-normal uppercase tracking-wide text-slate-400">Дата формирования</div>
+              <div className="mt-1 font-normal text-slate-950">{createdAt}</div>
               <div className="mt-0.5 text-xs text-slate-500">Всего единиц: {formatNumber(totalQuantity)}</div>
             </div>
           </div>
 
           {comment.trim() ? (
             <div className="mt-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-              <span className="font-semibold">Комментарий: </span>
+              <span className="font-normal">Комментарий: </span>
               {comment}
             </div>
           ) : null}
@@ -269,11 +540,13 @@ function RequestPreviewModal({
                     <tr key={line.id} className={index % 2 ? 'bg-white' : 'bg-slate-50/45'}>
                       <td className={cn(requestTableCell, 'text-center text-slate-500')}>{index + 1}</td>
                       <td className={requestTableCell}>
-                        <div className="font-semibold text-slate-950">{item?.shortName ?? line.manualName}</div>
-                        <div className="mt-0.5 text-[11px] leading-4 text-slate-500">{item?.fullName ?? 'Ручная строка для разбора справочника'}</div>
+                        <div className="font-normal text-slate-950">{item ? catalogItemProfessionalName(item) : line.manualName}</div>
+                        <div className="mt-0.5 text-[11px] leading-4 text-slate-500">
+                          {item ? `${item.category}, ${item.unit}, ${item.packageLabel}` : 'Ручная строка для разбора справочника'}
+                        </div>
                       </td>
                       <td className={requestTableCell}>{item?.category ?? 'Ручная'}</td>
-                      <td className={cn(requestTableCell, 'text-center font-semibold text-slate-950')}>{formatNumber(line.quantity)}</td>
+                      <td className={cn(requestTableCell, 'text-center font-normal text-slate-950')}>{formatNumber(line.quantity)}</td>
                       <td className={cn(requestTableCell, 'text-center')}>{item?.unit ?? 'шт'}</td>
                       <td className={requestTableCell}>{item?.packageLabel ?? 'Требует уточнения'}</td>
                     </tr>
@@ -318,7 +591,7 @@ function RequestCart({
     <Panel className="flex h-full min-h-0 flex-col p-0">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 px-3 py-2.5">
-          <div className="text-base font-semibold text-slate-950">Заявка</div>
+          <div className="text-base font-normal text-slate-950">Заявка</div>
           <div className="text-xs text-slate-500">Строк: {cart.length}</div>
         </div>
         <div className="mr-3 flex shrink-0 items-center gap-2">
@@ -354,8 +627,8 @@ function RequestCart({
                     <td className={cn(requestTableCell, '!px-1 text-center text-slate-500')}>{index + 1}</td>
                     <td className={requestTableCell}>
                       <div className="min-w-0">
-                        <div className="break-words font-medium text-slate-950" title={item?.fullName ?? line.manualName}>
-                          {item?.shortName ?? line.manualName}
+                        <div className="break-words font-normal text-slate-950" title={item ? catalogItemProfessionalName(item) : line.manualName}>
+                          {item ? catalogItemProfessionalName(item) : line.manualName}
                         </div>
                         <div className="mt-0.5 text-[11px] text-slate-500">
                           {item ? `${item.category}, ${item.unit}` : 'Ручная строка'}
@@ -429,15 +702,37 @@ export function NurseCabinetPage() {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('Все')
   const [isManualOpen, setManualOpen] = useState(false)
+  const [manualInitialName, setManualInitialName] = useState('')
   const [isPreviewOpen, setPreviewOpen] = useState(false)
   const [previewComment, setPreviewComment] = useState('')
   const [expandedGroupIds, setExpandedGroupIds] = useState<Record<string, boolean>>({})
+  const [selectedHistoryRequestId, setSelectedHistoryRequestId] = useState<string | null>(null)
 
   const categories = useMemo(
-    () => ['Все', ...Array.from(new Set(catalog.filter((item) => item.active).map((item) => item.category)))],
+    () => [
+      'Все',
+      ...Array.from(new Set(catalog.filter((item) => item.active).map((item) => item.category))).sort(
+        (left, right) => (catalogCategoryRank.get(left) ?? 999) - (catalogCategoryRank.get(right) ?? 999) || left.localeCompare(right, 'ru'),
+      ),
+    ],
     [catalog],
   )
-  const activeCatalog = useMemo(() => catalog.filter((item) => item.active), [catalog])
+  const activeCatalog = useMemo(
+    () =>
+      catalog
+        .filter((item) => item.active)
+        .sort((left, right) => {
+          const leftRank = catalogSortRank(left)
+          const rightRank = catalogSortRank(right)
+
+          return (
+            leftRank.category - rightRank.category ||
+            leftRank.group - rightRank.group ||
+            leftRank.name.localeCompare(rightRank.name, 'ru')
+          )
+        }),
+    [catalog],
+  )
   const visibleCatalog = useMemo(() => {
     return activeCatalog
       .filter((item) => {
@@ -471,6 +766,12 @@ export function NurseCabinetPage() {
         .filter((candidate): candidate is CatalogItem => Boolean(candidate))
         .filter((candidate) => category === 'Все' || candidate.category === category).length
 
+      if (totalVariants < 2 || groupItems.length < 2) {
+        groupItems.forEach((variant) => rows.push({ type: 'item', item: variant }))
+        addedGroupIds.add(group.id)
+        return
+      }
+
       rows.push({ type: 'group', group, items: groupItems, totalVariants: groupMatchesQuery ? totalVariants : groupItems.length })
 
       if (expandedGroupIds[group.id]) {
@@ -489,7 +790,21 @@ export function NurseCabinetPage() {
     })
     return result
   }, [cart])
+  const frequentItems = useMemo(() => {
+    const frequentIds = roomId ? frequentItemIdsByRoomId[roomId] ?? [] : []
+    return frequentIds
+      .map((itemId) => activeCatalog.find((item) => item.id === itemId))
+      .filter((item): item is CatalogItem => Boolean(item))
+  }, [activeCatalog, roomId])
   const myRequests = requests.filter((request) => request.roomId === roomId && request.id !== orthodonticDemoRequestId)
+  const selectedHistoryRequest = selectedHistoryRequestId
+    ? myRequests.find((request) => request.id === selectedHistoryRequestId)
+    : undefined
+
+  function openManualItem(initialName = '') {
+    setManualInitialName(initialName.trim())
+    setManualOpen(true)
+  }
 
   function loadOrthodonticDemo() {
     loadRequestDraft(orthodonticDemoRequestId)
@@ -540,7 +855,7 @@ export function NurseCabinetPage() {
             min={1}
             value={cartLine.quantity}
             onChange={(event) => updateCatalogLineQuantity(cartLine, Number(event.target.value))}
-            className="h-7 w-10 border-x border-emerald-100 text-center text-xs font-semibold text-slate-950 outline-none"
+            className="h-7 w-10 border-x border-emerald-100 text-center text-xs font-normal text-slate-950 outline-none"
             aria-label="Количество в заявке"
           />
           <button
@@ -593,13 +908,12 @@ export function NurseCabinetPage() {
           <SectionHeader
             title={`Кабинет ${room?.number ?? ''}`}
             subtitle={cabinetSubtitle}
-            action={<StatusPill tone="success">Автоматически привязан к кабинету</StatusPill>}
           />
         </Panel>
 
         <section className="grid min-h-[360px] content-start gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <div>
-            <h2 className="text-xl font-semibold text-slate-950">Выберите, с чего начать</h2>
+            <h2 className="text-xl font-normal text-slate-950">Выберите, с чего начать</h2>
             <p className="mt-1 text-sm text-slate-500">Главная кабинета</p>
           </div>
 
@@ -616,9 +930,9 @@ export function NurseCabinetPage() {
                   <div className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-white text-emerald-800 transition group-hover:border-emerald-200">
                     <Icon size={20} />
                   </div>
-                  <div className="mt-4 text-lg font-semibold text-slate-950">{item.title}</div>
+                  <div className="mt-4 text-lg font-normal text-slate-950">{item.title}</div>
                   <div className="mt-1 text-sm leading-5 text-slate-500">{item.caption}</div>
-                  <div className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">{item.meta}</div>
+                  <div className="mt-4 text-xs font-normal uppercase tracking-wide text-slate-400">{item.meta}</div>
                 </Link>
               )
             })}
@@ -635,7 +949,6 @@ export function NurseCabinetPage() {
           <SectionHeader
             title={`Кабинет ${room?.number ?? ''}`}
             subtitle={cabinetSubtitle}
-            action={<StatusPill tone="success">Автоматически привязан к кабинету</StatusPill>}
           />
         </Panel>
 
@@ -644,15 +957,46 @@ export function NurseCabinetPage() {
         <div className="grid min-h-0 gap-2 lg:ml-[194px] xl:grid-cols-[minmax(860px,2.15fr)_minmax(330px,0.68fr)]">
           <div className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
             <div className="grid gap-2 border-b border-slate-200 bg-white p-2">
-              <label className="relative w-full max-w-[520px] sm:w-[460px]">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  className={`${fieldStyles} h-9 py-1.5 pl-8 text-xs`}
-                  placeholder="Поиск по названию: перчатки, композит, артикаин"
-                />
-              </label>
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <label className="relative w-full max-w-[520px] sm:w-[460px]">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    className={`${fieldStyles} h-9 py-1.5 pl-8 text-xs`}
+                    placeholder="Поиск по названию: перчатки, композит, артикаин"
+                  />
+                </label>
+                <Button variant="secondary" className="min-h-8 shrink-0 px-2 py-1 text-xs" onClick={() => openManualItem(query)}>
+                  <Plus size={14} />
+                  Позиция не найдена
+                </Button>
+              </div>
+              {frequentItems.length ? (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-xs">
+                  <span className="shrink-0 text-slate-400">Часто:</span>
+                  {frequentItems.map((item) => {
+                    const inCart = cartLineByItem.has(item.id)
+
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => addCatalogToCart(item.id, 1)}
+                        className={cn(
+                          'shrink-0 rounded-md border px-2 py-1 transition',
+                          inCart
+                            ? 'border-sky-200 bg-sky-50 text-sky-800'
+                            : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-900',
+                        )}
+                        title={catalogItemProfessionalName(item)}
+                      >
+                        {catalogItemProfessionalName(item)}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
               <div className="flex gap-1.5 overflow-x-auto pb-0.5">
                 {categories.map((item) => {
                   const active = category === item
@@ -663,7 +1007,7 @@ export function NurseCabinetPage() {
                       type="button"
                       onClick={() => setCategory(item)}
                       className={cn(
-                        'shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition',
+                        'shrink-0 rounded-full border px-3 py-1.5 text-xs font-normal transition',
                         active
                           ? 'border-emerald-700 bg-emerald-700 text-white shadow-sm'
                           : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-900',
@@ -685,18 +1029,18 @@ export function NurseCabinetPage() {
                   <col className="w-[14%]" />
                   <col className="w-[11%]" />
                 </colgroup>
-                <thead>
-                  <tr>
-                    <th className={cn(requestTableHeaderCell, '!px-1 text-center')}>№</th>
-                    <th className={requestTableHeaderCell}>Наименование</th>
-                    <th className={requestTableHeaderCell}>Раздел</th>
-                    <th className={requestTableHeaderCell}>Ед.</th>
-                    <th className={requestTableHeaderCell}>Упаковка</th>
-                    <th className={cn(requestTableHeaderCell, 'text-center')}>Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {catalogDisplayRows.map((row, index) => {
+              <thead>
+                <tr>
+                  <th className={cn(requestTableHeaderCell, '!px-1 !text-center')}>№</th>
+                  <th className={cn(requestTableHeaderCell, '!text-center')}>Наименование</th>
+                  <th className={cn(requestTableHeaderCell, '!text-center')}>Раздел</th>
+                  <th className={cn(requestTableHeaderCell, '!text-center')}>Ед.</th>
+                  <th className={cn(requestTableHeaderCell, '!text-center')}>Упаковка</th>
+                  <th className={cn(requestTableHeaderCell, '!text-center')}>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {catalogDisplayRows.map((row, index) => {
                     if (row.type === 'group') {
                       const expanded = Boolean(expandedGroupIds[row.group.id])
                       const selectedCount = row.items.filter((item) => cartLineByItem.has(item.id)).length
@@ -704,17 +1048,17 @@ export function NurseCabinetPage() {
                       return (
                         <tr
                           key={row.group.id}
-                          className="cursor-pointer border-b border-slate-100 bg-emerald-50/55 transition hover:bg-emerald-50"
+                          className="cursor-pointer border-b border-slate-100 bg-slate-50/45 transition hover:bg-slate-100/70"
                           onClick={() => toggleCatalogGroup(row.group.id)}
                         >
                           <td className={cn(requestTableCell, '!px-1 text-center text-xs text-slate-500')}>{index + 1}</td>
                           <td className={cn(requestTableCell, 'min-w-0')}>
                             <div className="flex min-w-0 items-start gap-2">
-                              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-emerald-800 shadow-sm">
+                              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm">
                                 {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                               </span>
                               <div className="min-w-0">
-                                <div className="font-semibold text-slate-950">{row.group.title}</div>
+                                <div className="font-normal text-slate-950">{row.group.title}</div>
                                 <div className="mt-0.5 text-[11px] text-slate-500">
                                   {row.group.note} · {row.totalVariants} варианта
                                   {selectedCount ? ` · выбрано: ${selectedCount}` : ''}
@@ -732,7 +1076,7 @@ export function NurseCabinetPage() {
                                 event.stopPropagation()
                                 toggleCatalogGroup(row.group.id)
                               }}
-                              className="inline-flex min-h-6 items-center justify-center rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-50"
+                              className="inline-flex min-h-6 items-center justify-center rounded-md border border-slate-200 bg-white px-2 text-xs font-normal text-slate-700 transition hover:bg-slate-50"
                             >
                               {expanded ? 'Свернуть' : 'Варианты'}
                             </button>
@@ -758,11 +1102,11 @@ export function NurseCabinetPage() {
                         <td className={cn(requestTableCell, 'min-w-0')}>
                           <div className={cn('flex min-w-0 items-start gap-1.5', row.nested && 'pl-7')}>
                             <div className="min-w-0 flex-1">
-                              <div className="whitespace-normal break-words font-medium text-slate-950" title={item.fullName}>
-                                {row.nested ? item.shortName : item.fullName}
+                              <div className="whitespace-normal break-words font-normal text-slate-950" title={catalogItemProfessionalName(item)}>
+                                {catalogItemProfessionalName(item)}
                               </div>
                               {row.nested ? (
-                                <div className="mt-0.5 text-[11px] leading-4 text-slate-500">{item.fullName}</div>
+                                <div className="mt-0.5 text-[11px] leading-4 text-slate-500">{item.category}, {item.unit}, {item.packageLabel}</div>
                               ) : null}
                             </div>
                           </div>
@@ -778,7 +1122,19 @@ export function NurseCabinetPage() {
               </table>
             </div>
 
-            {!catalogDisplayRows.length ? <EmptyState className="m-3">По этим фильтрам позиций нет.</EmptyState> : null}
+            {!catalogDisplayRows.length ? (
+              <EmptyState className="m-3">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <span>По этим фильтрам позиций нет.</span>
+                  {query.trim() ? (
+                    <Button variant="secondary" className="min-h-8 shrink-0 px-2 py-1 text-xs" onClick={() => openManualItem(query)}>
+                      <Plus size={14} />
+                      Добавить как ручную
+                    </Button>
+                  ) : null}
+                </div>
+              </EmptyState>
+            ) : null}
           </div>
 
           <aside className="h-full min-h-0 min-w-0">
@@ -796,51 +1152,165 @@ export function NurseCabinetPage() {
         ) : null}
 
         {location.hash === '#my-requests' ? (
-        <Panel id="my-requests" className="min-h-0 overflow-auto">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="text-lg font-semibold text-slate-950">Мои заявки</div>
-              <div className="text-sm text-slate-500">История кабинета {room?.number}</div>
+        <Panel id="my-requests" className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden p-0">
+          <div className="flex flex-col gap-2 border-b border-slate-200 p-3 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                {selectedHistoryRequest ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedHistoryRequestId(null)}
+                    className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <ArrowLeft size={14} />
+                    К списку
+                  </button>
+                ) : null}
+                <div className="text-lg font-normal text-slate-950">
+                  {selectedHistoryRequest ? requestDisplayTitle(selectedHistoryRequest, catalog, room) : 'Мои заявки'}
+                </div>
+              </div>
+              <div className="mt-1 text-sm text-slate-500">
+                {selectedHistoryRequest
+                  ? `${formatDateTime(selectedHistoryRequest.createdAt)} · ${selectedHistoryRequest.lines.length} позиций`
+                  : `История кабинета ${room?.number}`}
+              </div>
             </div>
-            <Button variant="secondary" onClick={() => setManualOpen(true)}>
-              Позиция не найдена
-            </Button>
           </div>
 
-          <div className="mt-4 grid gap-2">
-            {myRequests.map((request) => (
-              <div key={request.id} className="rounded-md border border-slate-200 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="font-semibold text-slate-950">{request.id}</div>
-                  <StatusPill tone={statusTone(request.status)}>{requestStatusLabels[request.status]}</StatusPill>
-                </div>
-                <div className="mt-1 text-sm text-slate-500">{formatDateTime(request.createdAt)}</div>
-                <div className="mt-2 grid gap-1 text-sm text-slate-700">
-                  {request.lines.map((line) => {
-                    const item = line.itemId ? catalog.find((candidate) => candidate.id === line.itemId) : undefined
-                    return (
-                      <div key={line.id} className="flex flex-wrap items-center justify-between gap-2">
-                        <span>{item?.shortName ?? line.manualName}</span>
-                        <span className="text-slate-500">
-                          {formatNumber(line.issuedQuantity)} / {formatNumber(line.quantity)} {item?.unit ?? ''}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-                {request.lines.some((line) => line.seniorComment) ? (
-                  <div className="mt-2 rounded-md bg-amber-50 p-2 text-sm text-amber-900">
-                    {request.lines.find((line) => line.seniorComment)?.seniorComment}
-                  </div>
-                ) : null}
+          <div className="min-h-0 overflow-auto p-3">
+            {selectedHistoryRequest ? (
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                <table className="w-full table-fixed border-separate border-spacing-0">
+                  <colgroup>
+                    <col className="w-[4%]" />
+                    <col className="w-[34%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[8%]" />
+                    <col className="w-[10%]" />
+                    <col className="w-[14%]" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th className={cn(requestTableHeaderCell, '!px-1 !text-center')}>№</th>
+                      <th className={requestTableHeaderCell}>Наименование</th>
+                      <th className={cn(requestTableHeaderCell, '!text-center')}>Раздел</th>
+                      <th className={cn(requestTableHeaderCell, '!text-center')}>Запрошено</th>
+                      <th className={cn(requestTableHeaderCell, '!text-center')}>Выдано</th>
+                      <th className={cn(requestTableHeaderCell, '!text-center')}>Ед.</th>
+                      <th className={requestTableHeaderCell}>Упаковка</th>
+                      <th className={cn(requestTableHeaderCell, '!text-center')}>Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedHistoryRequest.lines.map((line, index) => {
+                      const item = line.itemId ? catalog.find((candidate) => candidate.id === line.itemId) : undefined
+                      const isProcessed = selectedHistoryRequest.status !== 'sent' && selectedHistoryRequest.status !== 'in-review'
+                      const lineIssueStatus = requestLineIssueStatus(line, isProcessed)
+
+                      return (
+                        <tr key={line.id} className={cn(index % 2 ? 'bg-white' : 'bg-slate-50/35', lineIssueStatus.rowClassName)}>
+                          <td className={cn(requestTableCell, '!px-1 text-center text-slate-500')}>{index + 1}</td>
+                          <td className={requestTableCell}>
+                            <div className="whitespace-normal break-words font-normal text-slate-950" title={item?.fullName ?? line.manualName}>
+                              {item?.fullName ?? line.manualName ?? 'Ручная строка для разбора справочника'}
+                            </div>
+                            {line.seniorComment ? <div className="mt-1 text-[11px] leading-4 text-amber-800">{line.seniorComment}</div> : null}
+                          </td>
+                          <td className={requestTableCell}>{item?.category ?? 'Ручная'}</td>
+                          <td className={cn(requestTableCell, 'text-center text-slate-950')}>{formatNumber(line.quantity)}</td>
+                          <td className={cn(requestTableCell, 'text-center text-slate-950')}>{formatNumber(line.issuedQuantity)}</td>
+                          <td className={cn(requestTableCell, 'text-center')}>{item?.unit ?? 'шт.'}</td>
+                          <td className={requestTableCell}>{item?.packageLabel ?? 'Требует уточнения'}</td>
+                          <td className={requestTableCell}>
+                            <div className="flex justify-center">
+                              <StatusPill tone={lineIssueStatus.tone}>{lineIssueStatus.label}</StatusPill>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
-            ))}
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                <table className="w-full table-fixed border-separate border-spacing-0">
+                  <colgroup>
+                    <col className="w-[38%]" />
+                    <col className="w-[15%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[16%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[8%]" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th className={requestTableHeaderCell}>Название заявки</th>
+                      <th className={cn(requestTableHeaderCell, '!text-center')}>Дата</th>
+                      <th className={cn(requestTableHeaderCell, '!text-center')}>Статус</th>
+                      <th className={cn(requestTableHeaderCell, '!text-center')}>Выдача</th>
+                      <th className={cn(requestTableHeaderCell, '!text-center')}>Позиций</th>
+                      <th className={cn(requestTableHeaderCell, '!text-center')}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myRequests.map((request, index) => {
+                      const issueSummary = requestIssueSummary(request)
+
+                      return (
+                        <tr
+                          key={request.id}
+                          onClick={() => setSelectedHistoryRequestId(request.id)}
+                          className={cn('cursor-pointer transition hover:bg-slate-100/70', index % 2 ? 'bg-white' : 'bg-slate-50/35')}
+                        >
+                          <td className={cn(requestTableCell, 'min-w-0')}>
+                            <div className="truncate font-normal text-slate-950" title={requestDisplayTitle(request, catalog, room)}>
+                              {requestDisplayTitle(request, catalog, room)}
+                            </div>
+                          </td>
+                          <td className={cn(requestTableCell, 'text-center')}>{formatDateTime(request.createdAt)}</td>
+                          <td className={requestTableCell}>
+                            <div className="flex justify-center">
+                              <StatusPill tone={statusTone(request.status)}>{requestStatusLabels[request.status]}</StatusPill>
+                            </div>
+                          </td>
+                          <td className={requestTableCell}>
+                            <div className="flex justify-center">
+                              <StatusPill tone={issueSummary.tone}>{issueSummary.label}</StatusPill>
+                            </div>
+                          </td>
+                          <td className={cn(requestTableCell, 'text-center text-slate-950')}>{request.lines.length}</td>
+                          <td className={cn(requestTableCell, '!px-1 text-center')}>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                setSelectedHistoryRequestId(request.id)
+                              }}
+                              className="inline-flex min-h-6 items-center justify-center rounded-md border border-slate-200 bg-white px-2 text-xs font-normal text-slate-700 transition hover:bg-slate-50"
+                            >
+                              Открыть
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                {!myRequests.length ? <EmptyState className="m-3">Заявок кабинета пока нет.</EmptyState> : null}
+              </div>
+            )}
           </div>
         </Panel>
         ) : null}
       </section>
       {isManualOpen ? (
         <ManualItemModal
+          key={manualInitialName || 'empty-manual-item'}
+          initialName={manualInitialName}
           onClose={() => setManualOpen(false)}
           onAdd={(name, quantity, comment) => addManualLineToCart(name, quantity, comment)}
         />
