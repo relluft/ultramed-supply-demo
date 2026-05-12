@@ -85,6 +85,7 @@ export function ReplenishmentPage() {
     prepareReplenishmentInquiry,
     selectReplenishmentSupplier,
     updateReplenishmentQuantity,
+    updateReplenishmentQuantities,
     toggleReplenishmentInOrder,
     formSupplierOrders,
   } = useDemo()
@@ -478,6 +479,15 @@ export function ReplenishmentPage() {
     setSupplierAttentionByLineId({})
   }
 
+  function handleSetAllPurchasesToMinimum() {
+    const quantitiesByLineId = tableLines.reduce<Record<string, number>>((result, line) => {
+      result[line.id] = Math.max(line.minStock - line.currentStock, 0)
+      return result
+    }, {})
+
+    updateReplenishmentQuantities(quantitiesByLineId)
+  }
+
   function changeSupplier(lineId: string, supplierId: string) {
     selectReplenishmentSupplier(lineId, supplierId)
     setSupplierAttentionByLineId((current) => ({ ...current, [lineId]: false }))
@@ -629,7 +639,19 @@ export function ReplenishmentPage() {
                   <th className={headerCell}>Позиция</th>
                   <th className={headerCell}>Остаток</th>
                   <th className={headerCell}>Мин.</th>
-                  <th className={headerCell}>Закупка</th>
+                  <th className={headerCell}>
+                    <div className="grid justify-items-center gap-1">
+                      <span>Закупка</span>
+                      <button
+                        type="button"
+                        onClick={handleSetAllPurchasesToMinimum}
+                        className="inline-flex h-5 items-center rounded-md border border-emerald-200 bg-white px-1.5 text-[10px] font-normal normal-case tracking-normal text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-50"
+                        title="Заполнить закупку по всем строкам до минимального остатка"
+                      >
+                        все до мин.
+                      </button>
+                    </div>
+                  </th>
                   <th className={headerCell}>Цена с НДС</th>
                   <th className={headerCell}>НДС за ед.</th>
                   <th className={headerCell}>Сумма с НДС</th>

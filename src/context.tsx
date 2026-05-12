@@ -737,6 +737,7 @@ interface DemoContextValue {
   prepareReplenishmentInquiry: (supplierId: string, lineIds: string[]) => void
   selectReplenishmentSupplier: (lineId: string, supplierId: string) => void
   updateReplenishmentQuantity: (lineId: string, quantity: number) => void
+  updateReplenishmentQuantities: (quantitiesByLineId: Record<string, number>) => void
   updateReplenishmentComment: (lineId: string, comment: string) => void
   toggleReplenishmentInOrder: (lineId: string, included: boolean) => void
   formSupplierOrders: (lineIds?: string[]) => string[]
@@ -1292,6 +1293,25 @@ export function DemoProvider({ children }: PropsWithChildren) {
     })
   }, [])
 
+  const updateReplenishmentQuantities = useCallback((quantitiesByLineId: Record<string, number>) => {
+    setState((current) => {
+      const next = clone(current)
+      let changed = false
+
+      next.replenishment.forEach((line) => {
+        if (!(line.id in quantitiesByLineId)) return
+
+        const quantity = clampNumber(Math.round(quantitiesByLineId[line.id] || 0), 0, 999)
+        if (line.recommendedQuantity === quantity) return
+
+        line.recommendedQuantity = quantity
+        changed = true
+      })
+
+      return changed ? next : current
+    })
+  }, [])
+
   const toggleReplenishmentInOrder = useCallback((lineId: string, included: boolean) => {
     setState((current) => {
       const next = clone(current)
@@ -1516,6 +1536,7 @@ export function DemoProvider({ children }: PropsWithChildren) {
       prepareReplenishmentInquiry,
       selectReplenishmentSupplier,
       updateReplenishmentQuantity,
+      updateReplenishmentQuantities,
       updateReplenishmentComment,
       toggleReplenishmentInOrder,
       formSupplierOrders,
@@ -1546,6 +1567,7 @@ export function DemoProvider({ children }: PropsWithChildren) {
       prepareReplenishmentInquiry,
       selectReplenishmentSupplier,
       updateReplenishmentQuantity,
+      updateReplenishmentQuantities,
       updateReplenishmentComment,
       toggleReplenishmentInOrder,
       formSupplierOrders,
