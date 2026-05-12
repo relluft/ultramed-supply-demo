@@ -25,7 +25,7 @@ export function AppLayout() {
   const header = (
     <header
       className={cn(
-        'flex min-h-[58px] items-center justify-end rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm',
+        'flex min-h-[58px] items-center justify-end gap-3 rounded-lg border border-slate-200/80 bg-white px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.035)]',
         isNurseRequestWorkspace && 'lg:ml-[194px]',
       )}
     >
@@ -47,13 +47,13 @@ export function AppLayout() {
   )
 
   return (
-    <div className="h-screen overflow-hidden bg-slate-100">
-      <div className="relative flex h-full w-full flex-col gap-2 p-2 lg:flex-row lg:pl-1">
+    <div className="h-screen overflow-hidden bg-[#f4f7f8]">
+      <div className="relative flex h-full w-full flex-col gap-3 p-3 lg:flex-row lg:pl-2">
         <div className={cn(isNurseRequestWorkspace && 'lg:absolute lg:left-1 lg:top-0 lg:z-20')}>
           <WorkspaceSidebar />
         </div>
 
-        <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col gap-2', isNurseRequestWorkspace && 'lg:w-full')}>
+        <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col gap-3', isNurseRequestWorkspace && 'lg:w-full')}>
           {header}
 
           <main className="min-h-0 min-w-0 flex-1 overflow-auto">

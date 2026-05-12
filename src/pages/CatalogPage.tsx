@@ -26,7 +26,7 @@ export function CatalogPage() {
   }
 
   return (
-    <PageTransition className="grid gap-3">
+    <PageTransition className="grid gap-4">
       <Panel>
         <SectionHeader
           title="Материалы"
@@ -51,9 +51,10 @@ export function CatalogPage() {
 
       <Panel className="overflow-hidden p-0">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1280px] border-separate border-spacing-0">
+          <table className="w-full min-w-[1320px] border-separate border-spacing-0">
             <thead>
               <tr>
+                <th className={tableHeaderCell}>№</th>
                 <th className={tableHeaderCell}>Полное название</th>
                 <th className={tableHeaderCell}>Короткое</th>
                 <th className={tableHeaderCell}>Категория</th>
@@ -69,13 +70,17 @@ export function CatalogPage() {
               </tr>
             </thead>
             <tbody>
-              {activeMaterials.map((item) => (
+              {activeMaterials.map((item, index) => (
                 <tr key={item.id}>
+                  <td className={tableCell}>{index + 1}</td>
                   <td className={tableCell}>{item.fullName}</td>
                   <td className={tableCell}>
                     <div className="font-semibold text-slate-950">{item.shortName}</div>
-                    {item.shortName.includes('4181') || item.shortName.includes('4191') ? (
-                      <div className="mt-1 text-xs font-semibold text-amber-700">Похожий код: проверять 4181/4191</div>
+                    {item.shortName.includes('4181') ||
+                    item.shortName.includes('4182') ||
+                    item.shortName.includes('4191') ||
+                    item.shortName.includes('4192') ? (
+                      <div className="mt-1 text-xs font-semibold text-amber-700">Проверять диаметр и абразивность: 4181/4182/4191/4192</div>
                     ) : null}
                   </td>
                   <td className={tableCell}>{item.category}</td>

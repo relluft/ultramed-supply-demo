@@ -1,6 +1,7 @@
 import { ArrowLeft, ChevronDown, ChevronRight, ClipboardList, Home, Plus, Search, Trash2, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { BrandedLoadingModal } from '../components/BrandedLoadingModal'
 import { PageTransition } from '../components/PageTransition'
 import { Button, EmptyState, Panel, SectionHeader, StatusPill, fieldStyles } from '../components/ui'
 import { useDemo } from '../context'
@@ -118,9 +119,9 @@ const catalogVariantGroups = [
   },
   {
     id: 'polishing-discs',
-    title: 'Диски полировочные стоматологические абразивные',
-    note: 'набор и зернистость',
-    itemIds: ['item-disc-4181', 'item-disc-4191', 'item-disc-coarse', 'item-disc-fine'],
+    title: 'Диски финишно-полировочные Kerr OptiDisc для реставраций',
+    note: 'диаметр, референс Kerr и абразивная ступень в мкм',
+    itemIds: ['item-disc-4181', 'item-disc-coarse', 'item-disc-4191', 'item-disc-fine'],
   },
   {
     id: 'polishing-strips',
@@ -542,7 +543,7 @@ function RequestPreviewModal({
                       <td className={requestTableCell}>
                         <div className="font-normal text-slate-950">{item ? catalogItemProfessionalName(item) : line.manualName}</div>
                         <div className="mt-0.5 text-[11px] leading-4 text-slate-500">
-                          {item ? `${item.category}, ${item.unit}, ${item.packageLabel}` : 'Ручная строка для разбора справочника'}
+                          {item ? `${item.category}, ${item.unit}` : 'Ручная строка для разбора справочника'}
                         </div>
                       </td>
                       <td className={requestTableCell}>{item?.category ?? 'Ручная'}</td>
@@ -705,8 +706,21 @@ export function NurseCabinetPage() {
   const [manualInitialName, setManualInitialName] = useState('')
   const [isPreviewOpen, setPreviewOpen] = useState(false)
   const [previewComment, setPreviewComment] = useState('')
+  const [isSubmitLoading, setSubmitLoading] = useState(false)
   const [expandedGroupIds, setExpandedGroupIds] = useState<Record<string, boolean>>({})
   const [selectedHistoryRequestId, setSelectedHistoryRequestId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isSubmitLoading) return
+
+    const timer = window.setTimeout(() => {
+      submitRequest(previewComment)
+      setPreviewComment('')
+      setSubmitLoading(false)
+    }, 2000)
+
+    return () => window.clearTimeout(timer)
+  }, [isSubmitLoading, previewComment, submitRequest])
 
   const categories = useMemo(
     () => [
@@ -796,7 +810,7 @@ export function NurseCabinetPage() {
       .map((itemId) => activeCatalog.find((item) => item.id === itemId))
       .filter((item): item is CatalogItem => Boolean(item))
   }, [activeCatalog, roomId])
-  const myRequests = requests.filter((request) => request.roomId === roomId && request.id !== orthodonticDemoRequestId)
+  const myRequests = requests.filter((request) => request.roomId === roomId)
   const selectedHistoryRequest = selectedHistoryRequestId
     ? myRequests.find((request) => request.id === selectedHistoryRequestId)
     : undefined
@@ -818,9 +832,8 @@ export function NurseCabinetPage() {
   }
 
   function confirmRequestSubmit() {
-    submitRequest(previewComment)
     setPreviewOpen(false)
-    setPreviewComment('')
+    setSubmitLoading(true)
   }
 
   function updateCatalogLineQuantity(line: RequestCartLine, quantity: number) {
@@ -903,7 +916,7 @@ export function NurseCabinetPage() {
     ]
 
     return (
-      <PageTransition className="grid gap-3">
+      <PageTransition className="grid gap-4">
         <Panel>
           <SectionHeader
             title={`Кабинет ${room?.number ?? ''}`}
@@ -911,7 +924,7 @@ export function NurseCabinetPage() {
           />
         </Panel>
 
-        <section className="grid min-h-[360px] content-start gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <section className="grid min-h-[360px] content-start gap-3 rounded-lg border border-slate-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
           <div>
             <h2 className="text-xl font-normal text-slate-950">Выберите, с чего начать</h2>
             <p className="mt-1 text-sm text-slate-500">Главная кабинета</p>
@@ -945,7 +958,7 @@ export function NurseCabinetPage() {
   return (
     <PageTransition className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden">
       <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2">
-        <Panel className="p-3 lg:ml-[194px]">
+        <Panel className={cn('p-3', location.hash === '#request' && 'lg:ml-[194px]')}>
           <SectionHeader
             title={`Кабинет ${room?.number ?? ''}`}
             subtitle={cabinetSubtitle}
@@ -1106,7 +1119,7 @@ export function NurseCabinetPage() {
                                 {catalogItemProfessionalName(item)}
                               </div>
                               {row.nested ? (
-                                <div className="mt-0.5 text-[11px] leading-4 text-slate-500">{item.category}, {item.unit}, {item.packageLabel}</div>
+                                <div className="mt-0.5 text-[11px] leading-4 text-slate-500">{item.category}, {item.unit}</div>
                               ) : null}
                             </div>
                           </div>
@@ -1325,6 +1338,7 @@ export function NurseCabinetPage() {
           onConfirm={confirmRequestSubmit}
         />
       ) : null}
+      {isSubmitLoading ? <BrandedLoadingModal title="Формируем заявку" /> : null}
     </PageTransition>
   )
 }

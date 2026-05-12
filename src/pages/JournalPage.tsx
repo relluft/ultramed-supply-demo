@@ -28,7 +28,7 @@ export function JournalPage() {
   } = useDemo()
 
   return (
-    <PageTransition className="grid gap-3">
+    <PageTransition className="grid gap-4">
       <Panel>
         <SectionHeader title="Журнал" subtitle="События демо-контура: заявки, выдача, пополнение, поставщики, заказы и приход." />
       </Panel>

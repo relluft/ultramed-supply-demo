@@ -10,7 +10,7 @@ export function SuppliersPage() {
   } = useDemo()
 
   return (
-    <PageTransition className="grid gap-3">
+    <PageTransition className="grid gap-4">
       <Panel>
         <SectionHeader title="Поставщики" subtitle="Три разрешенных поставщика в demo-контуре УльтраМед Снабжение." />
       </Panel>

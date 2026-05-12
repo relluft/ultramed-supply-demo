@@ -122,7 +122,7 @@ export interface ReplenishmentLine {
   id: string
   itemId: string
   requestId?: string
-  source: 'after-issue' | 'below-minimum' | 'manual' | 'not-enough'
+  source: 'after-issue' | 'below-minimum' | 'manual' | 'not-enough' | 'request'
   currentStock: number
   minStock: number
   desiredStock: number
@@ -159,6 +159,7 @@ export interface SupplierOrderLine {
   comment?: string
   receiptComment?: string
   receivedQuantity?: number
+  receivedAt?: string
 }
 
 export type JournalEventType =

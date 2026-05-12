@@ -17,7 +17,7 @@ import { roleLabels } from '../lib/demoLogic'
 import { cn } from '../lib/format'
 import type { DemoRole } from '../types/demo'
 
-type LoginStep = 'idle' | 'typing' | 'loading'
+type LoginStep = 'idle' | 'typing' | 'loading' | 'splash'
 
 const loginProfiles: Record<
   DemoRole,
@@ -94,16 +94,22 @@ export function StartPage() {
   useEffect(() => {
     if (!selectedRole || loginStep === 'idle' || !selectedProfile) return undefined
 
-    const loadingTimer = window.setTimeout(() => setLoginStep('loading'), 750)
+    if (loginStep === 'typing') {
+      const timer = window.setTimeout(() => setLoginStep('loading'), 650)
+      return () => window.clearTimeout(timer)
+    }
+
+    if (loginStep === 'loading') {
+      const timer = window.setTimeout(() => setLoginStep('splash'), 650)
+      return () => window.clearTimeout(timer)
+    }
+
     const navigateTimer = window.setTimeout(() => {
       startDemo(selectedRole)
       navigate(selectedProfile.route)
-    }, 1650)
+    }, 820)
 
-    return () => {
-      window.clearTimeout(loadingTimer)
-      window.clearTimeout(navigateTimer)
-    }
+    return () => window.clearTimeout(navigateTimer)
   }, [loginStep, navigate, selectedProfile, selectedRole, startDemo])
 
   function openAuth() {
@@ -282,7 +288,7 @@ export function StartPage() {
                             <motion.div
                               className="h-full rounded-full bg-[#267e63]"
                               initial={{ width: '18%' }}
-                              animate={{ width: loginStep === 'typing' ? '58%' : '100%' }}
+                              animate={{ width: loginStep === 'typing' ? '58%' : loginStep === 'loading' ? '86%' : '100%' }}
                               transition={{ duration: 0.55 }}
                             />
                           </div>
@@ -293,6 +299,36 @@ export function StartPage() {
                 ) : null}
               </AnimatePresence>
             </motion.section>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+      <AnimatePresence>
+        {loginStep === 'splash' ? (
+          <motion.div
+            className="fixed inset-0 z-[60] grid place-items-center bg-[#063f36] px-8"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
+            <motion.div
+              className="grid w-full max-w-xl place-items-center rounded-[30px] border border-white/18 bg-white/95 px-8 py-9 shadow-[0_24px_70px_rgba(0,35,28,0.26)]"
+              initial={{ opacity: 0, y: 10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.99 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+            >
+              <img src="/brand/ultramed-main-logo.svg" alt="УльтраМед" className="h-auto w-full max-w-[430px]" />
+              <div className="mt-2 text-center text-2xl font-normal leading-none text-[#6089bb]">СНАБЖЕНИЕ</div>
+              <div className="mt-6 h-1.5 w-full max-w-[280px] overflow-hidden rounded-full bg-[#dcefe7]">
+                <motion.div
+                  className="h-full rounded-full bg-[#267e63]"
+                  initial={{ width: '18%' }}
+                  animate={{ width: '100%' }}
+                  transition={{ duration: 0.72, ease: 'easeOut' }}
+                />
+              </div>
+            </motion.div>
           </motion.div>
         ) : null}
       </AnimatePresence>

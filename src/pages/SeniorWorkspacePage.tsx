@@ -46,7 +46,7 @@ type IssueDraft =
 
 const seniorDashboardGroups = [
   {
-    title: 'Работа',
+    title: 'Операции',
     items: [
       { to: '/senior#requests', label: 'Заявки', caption: 'Входящие заявки кабинетов и выдача материалов', icon: ClipboardList },
       { to: '/replenishment', label: 'Пополнение', caption: 'Дефицит после обработки заявки', icon: PackagePlus },
@@ -492,64 +492,42 @@ export function SeniorWorkspacePage() {
                 <th className={cn(overviewHeaderCell, 'w-[86px]')}>
                   <div className="flex justify-center">Позиций</div>
                 </th>
-                <th className={cn(overviewHeaderCell, 'w-[280px]')}>
-                  <div className="flex justify-center">Состав</div>
-                </th>
-                <th className={cn(overviewHeaderCell, 'w-[420px]')}>
+                <th className={cn(overviewHeaderCell, 'w-[700px]')}>
                   <div className="flex justify-center">Комментарий</div>
                 </th>
               </tr>
             </thead>
             <tbody>
               {visibleRequests.map((request) => {
-                const stats = getRequestStats(request)
-                const firstLine = request.lines[0]
-                const firstItem = firstLine?.itemId ? catalog.find((candidate) => candidate.id === firstLine.itemId) : undefined
-                const preview = firstLine
-                  ? `${firstItem?.fullName ?? firstLine.manualName ?? 'Позиция'} (${formatNumber(firstLine.quantity)} ${firstItem?.unit ?? ''})`
-                  : '—'
-
-              return (
-                <tr
-                  key={request.id}
-                  onClick={() => openRequest(request.id)}
-                  className="cursor-pointer transition hover:bg-emerald-50/60"
-                >
-                  <td className={cn(overviewTableCell, 'whitespace-nowrap text-left text-slate-500')}>{formatDateTime(request.createdAt)}</td>
-                  <td className={cn(overviewTableCell, 'whitespace-nowrap text-slate-950')}>{requestCabinetLabel(request)}</td>
-                  <td className={overviewTableCell}>
-                    <div className="max-w-[410px] truncate text-slate-950" title={requestTitle(request)}>
-                      {requestTitle(request)}
-                    </div>
-                  </td>
-                  <td className={cn(overviewTableCell, 'text-center')}>
-                    <div className="flex justify-center">
-                      <StatusPill className="whitespace-nowrap !font-normal" tone={statusTone(request.status)}>
-                        {requestStatusLabel(request)}
-                      </StatusPill>
-                    </div>
-                  </td>
-                  <td className={cn(overviewTableCell, 'text-center text-slate-950')}>{request.lines.length}</td>
-                  <td className={overviewTableCell}>
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="min-w-0 flex-1 truncate text-slate-600">
-                        {preview}
-                      </span>
-                      {stats.manualCount ? (
-                        <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-normal text-amber-800">
-                          ручн. {stats.manualCount}
-                        </span>
-                      ) : null}
-                    </div>
-                  </td>
-                  <td className={overviewTableCell}>
-                    <div className="whitespace-normal break-words text-slate-600" title={request.comment}>
-                      {request.comment || ''}
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
+                return (
+                  <tr
+                    key={request.id}
+                    onClick={() => openRequest(request.id)}
+                    className="cursor-pointer transition hover:bg-emerald-50/60"
+                  >
+                    <td className={cn(overviewTableCell, 'whitespace-nowrap text-left text-slate-500')}>{formatDateTime(request.createdAt)}</td>
+                    <td className={cn(overviewTableCell, 'whitespace-nowrap text-slate-950')}>{requestCabinetLabel(request)}</td>
+                    <td className={overviewTableCell}>
+                      <div className="max-w-[410px] truncate text-slate-950" title={requestTitle(request)}>
+                        {requestTitle(request)}
+                      </div>
+                    </td>
+                    <td className={cn(overviewTableCell, 'text-center')}>
+                      <div className="flex justify-center">
+                        <StatusPill className="whitespace-nowrap !font-normal" tone={statusTone(request.status)}>
+                          {requestStatusLabel(request)}
+                        </StatusPill>
+                      </div>
+                    </td>
+                    <td className={cn(overviewTableCell, 'text-center text-slate-950')}>{request.lines.length}</td>
+                    <td className={overviewTableCell}>
+                      <div className="whitespace-normal break-words text-slate-600" title={request.comment}>
+                        {request.comment || ''}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -563,7 +541,7 @@ export function SeniorWorkspacePage() {
 
   if (!location.hash) {
     return (
-      <PageTransition className="grid gap-3">
+      <PageTransition className="grid gap-4">
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <h1 className="text-2xl font-semibold text-slate-950">Главная</h1>
           <p className="mt-1 text-sm text-slate-500">Выберите, с чего начать</p>

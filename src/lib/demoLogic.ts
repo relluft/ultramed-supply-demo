@@ -82,6 +82,7 @@ export const replenishmentSourceLabels: Record<ReplenishmentLine['source'], stri
   'below-minimum': 'Ниже минимума',
   manual: 'Добавлено вручную',
   'not-enough': 'Не хватило для заявки',
+  request: 'По заявке кабинета',
 }
 
 export function roleToRoomId(role: DemoRole) {

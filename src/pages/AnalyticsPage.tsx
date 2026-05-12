@@ -1,7 +1,7 @@
-import { AlertTriangle, BarChart3, Boxes, Gauge, PackageCheck, ReceiptText, Truck, WalletCards } from 'lucide-react'
+import { AlertTriangle, BarChart3, Boxes, Download, Gauge, PackageCheck, ReceiptText, Truck, WalletCards } from 'lucide-react'
 import { useMemo, type ReactNode } from 'react'
 import { PageTransition } from '../components/PageTransition'
-import { Panel, StatusPill } from '../components/ui'
+import { Button, Panel, StatusPill } from '../components/ui'
 import { useDemo } from '../context'
 import { availabilityLabels, getStockQuantity, orderStatusLabels, requestStatusLabels, statusTone } from '../lib/demoLogic'
 import { cn, formatNumber } from '../lib/format'
@@ -50,6 +50,15 @@ function moneyFromOrder(order: ReturnType<typeof useDemo>['state']['orders'][num
   return order.lines.reduce((sum, line) => sum + (line.price ?? 0) * line.quantity, 0)
 }
 
+function escapeHtml(value: string | number) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
 function Section({
   icon,
   title,
@@ -76,6 +85,41 @@ function Section({
       </div>
       {children}
     </Panel>
+  )
+}
+
+function ExecutiveMetric({
+  icon,
+  label,
+  value,
+  caption,
+  accent = 'neutral',
+}: {
+  icon: ReactNode
+  label: string
+  value: string | number
+  caption?: string
+  accent?: 'neutral' | 'success' | 'warning' | 'danger' | 'info'
+}) {
+  const colors = {
+    neutral: 'border-slate-200 bg-white text-slate-600',
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    warning: 'border-amber-200 bg-amber-50 text-amber-700',
+    danger: 'border-rose-200 bg-rose-50 text-rose-700',
+    info: 'border-sky-200 bg-sky-50 text-sky-700',
+  }[accent]
+
+  return (
+    <div className="grid min-h-[112px] grid-rows-[auto_1fr] rounded-md border border-slate-200 bg-white p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="truncate text-[11px] uppercase tracking-wide text-slate-500">{label}</div>
+        <div className={cn('grid size-8 shrink-0 place-items-center rounded-md border', colors)}>{icon}</div>
+      </div>
+      <div className="mt-3 flex min-h-0 flex-col justify-end">
+        <div className="truncate text-2xl font-medium leading-none text-slate-950 tabular-nums">{value}</div>
+        {caption ? <div className="mt-1 truncate text-xs text-slate-500">{caption}</div> : null}
+      </div>
+    </div>
   )
 }
 
@@ -341,18 +385,154 @@ export function AnalyticsPage() {
   const supplierSingleChannelItems = supplierStats.reduce((sum, item) => sum + item.noAlternatives, 0)
   const supplierAlternativeItems = metrics.activeCatalog.length - supplierSingleChannelItems
 
+  function handleExportReport() {
+    const generatedAt = new Date().toLocaleString('ru-RU')
+    const summaryRows = [
+      ['Индекс склада', `${metrics.stockHealth}%`],
+      ['Стоимость склада', money(metrics.stockValue)],
+      ['Заказано поставщикам', money(metrics.orderedTotal)],
+      ['Сумма в ожидании прихода', money(metrics.waitingReceiptTotal)],
+      ['Дефицит к минимуму', money(metrics.deficitValue)],
+      ['Добор до желаемого уровня', money(metrics.desiredShortageValue)],
+      ['Дефицитных позиций', formatNumber(problemItems.length)],
+      ['Поставщиков в заказах', formatNumber(supplierStats.filter((item) => item.orders > 0).length)],
+      ['Топ поставщик', readable(topSupplier?.supplier.name) || '-'],
+      ['Доля топ-1 поставщика', `${supplierConcentration}%`],
+    ]
+    const categoryRows = categoryStats.map((item) => [
+      item.category,
+      formatNumber(item.total),
+      formatNumber(item.below),
+      formatNumber(item.out),
+      money(item.deficitValue),
+    ])
+    const deficitRows = problemItems.map((row) => [
+      readable(row.item.shortName || row.item.fullName),
+      readable(row.supplier?.name) || '-',
+      formatNumber(row.quantity),
+      formatNumber(row.deficit),
+      money(row.deficitValue),
+    ])
+    const supplierRows = supplierStats.map((item) => [
+      readable(item.supplier.name),
+      money(item.total),
+      `${percent(item.total, Math.max(metrics.orderedTotal, 1))}%`,
+      formatNumber(item.primaryCatalog),
+      formatNumber(item.noAlternatives),
+      formatNumber(item.waiting),
+    ])
+
+    const table = (title: string, headings: string[], rows: Array<Array<string | number>>) => `
+      <section>
+        <h2>${escapeHtml(title)}</h2>
+        <table>
+          <thead><tr>${headings.map((heading) => `<th>${escapeHtml(heading)}</th>`).join('')}</tr></thead>
+          <tbody>${rows
+            .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`)
+            .join('')}</tbody>
+        </table>
+      </section>
+    `
+
+    const html = `<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>UltraMed Supply - аналитический отчет</title>
+  <style>
+    body { margin: 0; padding: 32px; color: #172033; background: #f4f7f8; font-family: Inter, Arial, sans-serif; }
+    main { max-width: 1120px; margin: 0 auto; border: 1px solid #dce4ea; border-radius: 14px; background: #fff; overflow: hidden; }
+    header { padding: 24px 28px; border-bottom: 1px solid #e2e8f0; }
+    .brand { color: #0f766e; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 8px 0 4px; font-size: 28px; line-height: 1.15; }
+    .date { color: #64748b; font-size: 13px; }
+    section { padding: 22px 28px; border-bottom: 1px solid #e2e8f0; }
+    section:last-child { border-bottom: 0; }
+    h2 { margin: 0 0 12px; font-size: 17px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: #f8fafc; color: #64748b; font-size: 11px; text-align: left; text-transform: uppercase; letter-spacing: .04em; }
+    th, td { border-bottom: 1px solid #e2e8f0; padding: 9px 10px; vertical-align: top; }
+    td { color: #263244; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="brand">UltraMed Supply</div>
+      <h1>Аналитический отчет по снабжению</h1>
+      <div class="date">Сформировано: ${escapeHtml(generatedAt)}</div>
+    </header>
+    ${table('Ключевые показатели', ['Показатель', 'Значение'], summaryRows)}
+    ${table('Категории склада', ['Категория', 'Позиций', 'Ниже мин.', 'Нет остатка', 'Оценка дефицита'], categoryRows)}
+    ${table('Дефицитные позиции', ['Позиция', 'Поставщик', 'Остаток', 'Дефицит', 'Оценка'], deficitRows)}
+    ${table('Поставщики', ['Поставщик', 'Сумма заказов', 'Доля', 'Позиций каталога', 'Без альтернатив', 'Ожидание прихода'], supplierRows)}
+  </main>
+</body>
+</html>`
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `ultramed-supply-report-${new Date().toISOString().slice(0, 10)}.html`
+    document.body.append(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <PageTransition className="min-h-full">
-      <div className="grid gap-3 pb-4">
-        <Panel className="p-0">
+      <div className="grid gap-4 pb-4">
+        <Panel className="overflow-hidden p-0">
           <div className="flex min-h-14 flex-col gap-3 border-b border-slate-200 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h1 className="text-xl font-medium text-slate-950">Аналитика склада клиники</h1>
               <div className="mt-0.5 text-xs uppercase tracking-wide text-slate-500">Финансы · поставщики · процесс · складская политика</div>
             </div>
-            <StatusPill tone={metrics.stockHealth >= 85 ? 'success' : metrics.stockHealth >= 70 ? 'warning' : 'danger'}>
-              Индекс склада {metrics.stockHealth}%
-            </StatusPill>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <StatusPill tone={metrics.stockHealth >= 85 ? 'success' : metrics.stockHealth >= 70 ? 'warning' : 'danger'}>
+                Индекс склада {metrics.stockHealth}%
+              </StatusPill>
+              <Button variant="secondary" className="min-h-8 px-2.5 py-1.5 text-xs" onClick={handleExportReport}>
+                <Download size={15} />
+                Экспорт отчета
+              </Button>
+            </div>
+          </div>
+          <div className="grid gap-2 bg-slate-50/75 p-3 sm:grid-cols-2 xl:grid-cols-5">
+            <ExecutiveMetric
+              icon={<Gauge size={17} />}
+              label="Индекс склада"
+              value={`${metrics.stockHealth}%`}
+              caption={`${formatNumber(metrics.activeCatalog.length - metrics.belowMinimumItems.length)} из ${formatNumber(metrics.activeCatalog.length)} позиций в норме`}
+              accent={metrics.stockHealth >= 85 ? 'success' : metrics.stockHealth >= 70 ? 'warning' : 'danger'}
+            />
+            <ExecutiveMetric
+              icon={<WalletCards size={17} />}
+              label="Стоимость склада"
+              value={money(metrics.stockValue)}
+              caption={`${formatNumber(metrics.stockUnits)} единиц на складе`}
+            />
+            <ExecutiveMetric
+              icon={<AlertTriangle size={17} />}
+              label="Дефицит к минимуму"
+              value={money(metrics.deficitValue)}
+              caption={`${formatNumber(metrics.deficitUnits)} ед. до минимума`}
+              accent={metrics.deficitValue ? 'danger' : 'success'}
+            />
+            <ExecutiveMetric
+              icon={<PackageCheck size={17} />}
+              label="Ожидается приход"
+              value={money(metrics.waitingReceiptTotal)}
+              caption={`${formatNumber(metrics.waitingReceiptOrders.length)} заказов в ожидании`}
+              accent={metrics.waitingReceiptTotal ? 'info' : 'success'}
+            />
+            <ExecutiveMetric
+              icon={<Boxes size={17} />}
+              label="Добор до желаемого"
+              value={money(metrics.desiredShortageValue)}
+              caption={`${formatNumber(metrics.desiredShortageUnits)} ед. до целевого уровня`}
+              accent={metrics.desiredShortageValue ? 'warning' : 'success'}
+            />
           </div>
         </Panel>
 
@@ -415,7 +595,13 @@ export function AnalyticsPage() {
                 </thead>
                 <tbody>
                   {categoryStats.map((item) => (
-                    <tr key={item.category} className="hover:bg-slate-50">
+                    <tr
+                      key={item.category}
+                      className={cn(
+                        'transition hover:bg-slate-100/70',
+                        item.out ? 'bg-rose-50/70' : item.below ? 'bg-amber-50/60' : 'bg-white',
+                      )}
+                    >
                       <td className="border-b border-slate-100 px-3 py-2 text-sm font-medium text-slate-950">{item.category}</td>
                       <td className="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{formatNumber(item.total)}</td>
                       <td className="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{formatNumber(item.below)}</td>
@@ -528,7 +714,13 @@ export function AnalyticsPage() {
               </thead>
               <tbody>
                 {supplierStats.map((item) => (
-                  <tr key={item.supplier.id} className="hover:bg-slate-50">
+                  <tr
+                    key={item.supplier.id}
+                    className={cn(
+                      'transition hover:bg-slate-100/70',
+                      item.noAlternatives ? 'bg-amber-50/55' : item.waiting ? 'bg-sky-50/55' : 'bg-white',
+                    )}
+                  >
                     <td className="border-b border-slate-100 px-3 py-2">
                       <div className="text-sm font-medium text-slate-950">{readable(item.supplier.name)}</div>
                       <div className="text-xs text-slate-500">{readable(item.supplier.role)}</div>

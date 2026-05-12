@@ -28,7 +28,7 @@ type SidebarGroup = {
 
 const seniorGroups: SidebarGroup[] = [
   {
-    title: 'Работа',
+    title: 'Операции',
     icon: ClipboardList,
     items: [
       { to: '/senior#requests', label: 'Заявки', icon: ClipboardList },
@@ -111,8 +111,8 @@ export function WorkspaceSidebar() {
   return (
     <aside
       className={cn(
-        'rounded-lg border border-slate-200 bg-white p-2 shadow-sm lg:sticky lg:top-2 lg:shrink-0',
-        isNurse ? 'lg:h-auto lg:w-[186px] lg:self-start' : 'lg:h-[calc(100vh-1rem)] lg:w-[218px]',
+        'rounded-lg border border-slate-200/80 bg-white p-2 shadow-[0_1px_2px_rgba(15,23,42,0.035)] lg:sticky lg:top-3 lg:shrink-0',
+        isNurse ? 'lg:h-auto lg:w-[186px] lg:self-start' : 'lg:h-[calc(100vh-1.5rem)] lg:w-[218px]',
       )}
     >
       <div className={cn('flex flex-col items-center justify-center rounded-md px-2.5', isNurse ? 'h-14' : 'h-16')}>
@@ -146,7 +146,7 @@ export function WorkspaceSidebar() {
                     item.disabled
                       ? 'cursor-not-allowed text-slate-400 opacity-55'
                       : active
-                        ? 'bg-white pr-6 text-emerald-900 shadow-[0_5px_14px_rgba(15,118,110,0.12)] ring-1 ring-inset ring-emerald-600/35'
+                        ? 'bg-emerald-50 pr-6 text-emerald-900 ring-1 ring-inset ring-emerald-600/25'
                         : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950',
                   )
                   const content = (

@@ -1,6 +1,7 @@
 import { ArrowLeft, CheckCircle2, FileSpreadsheet, Loader2, ShoppingCart } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { BrandedLoadingModal } from '../components/BrandedLoadingModal'
 import { PageTransition } from '../components/PageTransition'
 import { Button, EmptyState, Panel, SectionHeader, StatusPill } from '../components/ui'
 import { useDemo } from '../context'
@@ -137,11 +138,11 @@ export function SupplierOrderFormationPage() {
         .filter((order) => order.status === 'draft' || order.status === 'ready-to-order')
         .forEach((order) => markOrderAsOrdered(order.id))
       setFormationStatus('done')
-    }, 950)
+    }, 2000)
   }
 
   return (
-    <PageTransition className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
+    <PageTransition className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4">
       <Panel>
         <SectionHeader
           title="Формирование пакета закупки"
@@ -338,12 +339,7 @@ export function SupplierOrderFormationPage() {
       )}
 
       {formationStatus === 'loading' ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-xs rounded-lg border border-slate-200 bg-white p-5 text-center shadow-2xl">
-            <Loader2 className="mx-auto animate-spin text-emerald-700" size={32} />
-            <div className="mt-3 text-lg font-normal text-slate-950">Формирование пакета</div>
-          </div>
-        </div>
+        <BrandedLoadingModal title="Формируем пакет поставщикам" />
       ) : null}
 
       {formationStatus === 'done' ? (

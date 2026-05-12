@@ -1,5 +1,5 @@
-import { PackagePlus, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { CheckCircle2, PackagePlus, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { PageTransition } from '../components/PageTransition'
 import { Button, EmptyState, Panel, SectionHeader, StatusPill, tableCell, tableHeaderCell } from '../components/ui'
 import { useDemo } from '../context'
@@ -12,10 +12,12 @@ export function StockPage() {
     state: { catalog, stock, suppliers, replenishment, journal },
     addItemToReplenishment,
   } = useDemo()
+  const toastTimerRef = useRef<number | null>(null)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState<'all' | StockStatus>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [toastMessage, setToastMessage] = useState('')
   const stockByItemId = useMemo(() => new Map(stock.map((item) => [item.itemId, item])), [stock])
   const categories = useMemo(
     () => Array.from(new Set(catalog.filter((item) => item.active).map((item) => item.category))).sort((left, right) => left.localeCompare(right, 'ru')),
@@ -44,7 +46,6 @@ export function StockPage() {
           quantity: stockRecord?.quantity ?? 0,
           status,
           shortageToMin: Math.max(item.minStock - (stockRecord?.quantity ?? 0), 0),
-          shortageToDesired: Math.max(item.desiredStock - (stockRecord?.quantity ?? 0), 0),
         }
       })
       .filter((row) => categoryFilter === 'all' || row.item.category === categoryFilter)
@@ -101,16 +102,38 @@ export function StockPage() {
     return journal.filter((event) => event.itemId === selectedItem.id).slice(0, 6)
   }, [journal, selectedItem])
 
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current)
+      }
+    }
+  }, [])
+
   function supplierName(id?: string) {
     return suppliers.find((supplier) => supplier.id === id)?.name ?? '—'
   }
 
+  function handleAddToReplenishment(item: CatalogItem) {
+    addItemToReplenishment(item.id)
+    setToastMessage(`${item.shortName} добавлена в пополнение`)
+
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current)
+    }
+
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMessage('')
+      toastTimerRef.current = null
+    }, 2600)
+  }
+
   return (
-    <PageTransition className="grid gap-3">
+    <PageTransition className="grid gap-4">
       <Panel>
         <SectionHeader
           title="Остатки"
-          subtitle="Полная складская ведомость по всем активным позициям справочника материалов: остаток, минимум, желательный уровень и поставщики."
+          subtitle="Полная складская ведомость по всем активным позициям справочника материалов: остаток, минимум и поставщики."
           action={
             <>
               <StatusPill tone="neutral">{stockMetrics.total} позиций</StatusPill>
@@ -187,11 +210,11 @@ export function StockPage() {
           <table className="w-full min-w-[1120px] border-separate border-spacing-0">
             <thead>
               <tr>
+                <th className={tableHeaderCell}>№</th>
                 <th className={tableHeaderCell}>Позиция</th>
                 <th className={tableHeaderCell}>Категория</th>
                 <th className={tableHeaderCell}>Остаток</th>
                 <th className={tableHeaderCell}>Мин.</th>
-                <th className={tableHeaderCell}>Желат.</th>
                 <th className={tableHeaderCell}>Ед.</th>
                 <th className={tableHeaderCell}>Основной</th>
                 <th className={tableHeaderCell}>Альтернатива</th>
@@ -215,6 +238,7 @@ export function StockPage() {
                       status === 'enough' && (index % 2 ? 'bg-white' : 'bg-slate-50/35'),
                     )}
                   >
+                    <td className={cn(tableCell, 'text-center text-xs text-slate-500')}>{index + 1}</td>
                     <td className={tableCell}>
                       <button
                         type="button"
@@ -232,7 +256,6 @@ export function StockPage() {
                       </span>
                     </td>
                     <td className={tableCell}>{formatNumber(item.minStock)}</td>
-                    <td className={tableCell}>{formatNumber(item.desiredStock)}</td>
                     <td className={tableCell}>{item.unit}</td>
                     <td className={tableCell}>{supplierName(item.primarySupplierId)}</td>
                     <td className={tableCell}>{item.alternativeSupplierIds.map(supplierName).join(', ') || '—'}</td>
@@ -242,15 +265,11 @@ export function StockPage() {
                         <div className="mt-1 text-[10px] leading-3 text-rose-600">
                           до мин.: {formatNumber(row.shortageToMin)}
                         </div>
-                      ) : row.shortageToDesired ? (
-                        <div className="mt-1 text-[10px] leading-3 text-slate-400">
-                          до жел.: {formatNumber(row.shortageToDesired)}
-                        </div>
                       ) : null}
                     </td>
                     <td className={tableCell}>{stockRecord?.lastMovementAt ? formatDateTime(stockRecord.lastMovementAt) : '—'}</td>
                     <td className={tableCell}>
-                      <Button variant="secondary" onClick={() => addItemToReplenishment(item.id)}>
+                      <Button variant="secondary" onClick={() => handleAddToReplenishment(item)}>
                         <PackagePlus size={15} />
                         Пополнить
                       </Button>
@@ -272,6 +291,22 @@ export function StockPage() {
           movementEvents={movementEvents}
           onClose={() => setSelectedItemId(null)}
         />
+      ) : null}
+      {toastMessage ? (
+        <div className="fixed bottom-5 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-center gap-3 rounded-lg border border-emerald-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-[0_18px_42px_rgba(15,23,42,0.18)]">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+            <CheckCircle2 size={20} />
+          </span>
+          <span className="min-w-0 flex-1">{toastMessage}</span>
+          <button
+            type="button"
+            onClick={() => setToastMessage('')}
+            className="flex size-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            aria-label="Закрыть уведомление"
+          >
+            <X size={15} />
+          </button>
+        </div>
       ) : null}
     </PageTransition>
   )
@@ -316,7 +351,6 @@ function StockItemDrawer({
           ['Упаковка', item.packageLabel],
           ['Текущий остаток', formatNumber(currentStock)],
           ['Минимум', String(item.minStock)],
-          ['Желательный остаток', String(item.desiredStock)],
           ['Основной поставщик', primarySupplier],
           ['Альтернативы', alternativeSuppliers.join(', ') || '—'],
         ].map(([label, value]) => (

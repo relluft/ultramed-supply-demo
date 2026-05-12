@@ -95,3 +95,34 @@ img {
   line-height: 1.16;
   text-wrap: balance;
 }
+
+table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+table tbody tr > td:first-child {
+  border-left: 3px solid transparent;
+}
+
+table tbody tr[class*="bg-rose"] > td:first-child,
+table tbody tr[class*="bg-red"] > td:first-child {
+  border-left-color: #e11d48;
+}
+
+table tbody tr[class*="bg-amber"] > td:first-child {
+  border-left-color: #d97706;
+}
+
+table tbody tr[class*="bg-sky"] > td:first-child {
+  border-left-color: #0284c7;
+}
+
+table tbody tr[class*="bg-emerald"] > td:first-child {
+  border-left-color: #059669;
+}
+
+table tbody tr:not([class*="bg-rose"]):not([class*="bg-red"]):not([class*="bg-amber"]):not([class*="bg-sky"]):not([class*="bg-emerald"]):hover > td:first-child {
+  border-left-color: #64748b;
+}

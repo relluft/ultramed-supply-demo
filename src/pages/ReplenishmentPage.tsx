@@ -1,6 +1,7 @@
-import { ArrowRight, Check, ChevronDown, ClipboardCheck, FileSpreadsheet, Loader2, Mail, Reply } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, ClipboardCheck, Download, FileSpreadsheet, Loader2, Mail, PackagePlus, Reply } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { BrandedLoadingModal } from '../components/BrandedLoadingModal'
 import { PageTransition } from '../components/PageTransition'
 import { EmptyState, Panel, SectionHeader, StatusPill } from '../components/ui'
 import { useDemo } from '../context'
@@ -9,7 +10,7 @@ import {
   clinicMainSupplierId,
   replenishmentSourceLabels,
 } from '../lib/demoLogic'
-import { cn, formatNumber } from '../lib/format'
+import { cn, formatDateTime, formatMoney, formatNumber } from '../lib/format'
 
 const headerCell =
   'sticky top-0 z-10 border-b border-r border-slate-200 bg-slate-50 px-2 py-1.5 text-center text-[11px] font-normal uppercase tracking-wide text-slate-500 last:border-r-0'
@@ -19,6 +20,54 @@ const supplierBadgeClass =
 const inquiryStepClass =
   'flex min-w-[160px] flex-1 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-700'
 const replenishmentSupplierIds = [clinicMainSupplierId, clinicBackupSupplierId]
+const replenishmentDisplayLimit = 20
+const vatRate = 0.2
+
+function escapeHtml(value: unknown) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function downloadExcelFile(fileName: string, html: string) {
+  const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+function fallbackPriceWithVat(item?: { id: string; category: string; price?: number }) {
+  if (!item) return 0
+  if (item.price && item.price > 0) return item.price
+
+  if (item.id.includes('primer')) return 2860
+  if (item.id.includes('wax')) return 1240
+  if (item.id.includes('archwires') || item.id.includes('niti')) return 3920
+  if (item.id.includes('elastics') || item.id.includes('ligatures') || item.id.includes('chain')) return 980
+  if (item.id.includes('hooks')) return 1760
+
+  const categoryPrice: Record<string, number> = {
+    Анестезия: 1680,
+    Гигиена: 920,
+    Дезинфекция: 1460,
+    Изоляция: 1320,
+    Ортодонтия: 2140,
+    Ортопедия: 2480,
+    Расходники: 760,
+    Терапия: 1180,
+    Хирургия: 1820,
+  }
+
+  return categoryPrice[item.category] ?? 990
+}
 
 export function ReplenishmentPage() {
   const navigate = useNavigate()
@@ -29,6 +78,7 @@ export function ReplenishmentPage() {
   const [supplierAttentionByLineId, setSupplierAttentionByLineId] = useState<Record<string, boolean>>({})
   const [openSupplierLineId, setOpenSupplierLineId] = useState<string | null>(null)
   const [workflowStage, setWorkflowStage] = useState<'inquiry' | 'order'>('inquiry')
+  const [selectedOperationKey, setSelectedOperationKey] = useState<string | null>('stock-deficit')
   const {
     state: { replenishment, catalog, suppliers, requests, activeRequestId },
     updateReplenishmentAvailability,
@@ -38,20 +88,75 @@ export function ReplenishmentPage() {
     toggleReplenishmentInOrder,
     formSupplierOrders,
   } = useDemo()
-  const activeRequest = requests.find((request) => request.id === activeRequestId)
   const clinicMainSupplier = suppliers.find((supplier) => supplier.id === clinicMainSupplierId)
-  const activeLines = useMemo(
+  const room105RequestIds = useMemo(
+    () => new Set(requests.filter((request) => request.roomId === 'room-105').map((request) => request.id)),
+    [requests],
+  )
+  const allActiveLines = useMemo(
     () =>
       replenishment
-        .filter((line) => !line.closedAt)
+        .filter(
+          (line) =>
+            !line.closedAt &&
+            (line.currentStock < line.minStock || line.source === 'not-enough' || line.source === 'manual'),
+        )
         .sort((left, right) => {
+          const leftNoStock = left.currentStock <= 0 ? 0 : 1
+          const rightNoStock = right.currentStock <= 0 ? 0 : 1
+          const leftRequest = left.requestId && room105RequestIds.has(left.requestId) ? 0 : 1
+          const rightRequest = right.requestId && room105RequestIds.has(right.requestId) ? 0 : 1
           const leftActive = left.requestId === activeRequestId ? 0 : 1
           const rightActive = right.requestId === activeRequestId ? 0 : 1
-          return leftActive - rightActive || new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
-        }),
-    [activeRequestId, replenishment],
+          return (
+            leftNoStock - rightNoStock ||
+            leftRequest - rightRequest ||
+            leftActive - rightActive ||
+            new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+          )
+        })
+        .slice(0, replenishmentDisplayLimit),
+    [activeRequestId, replenishment, room105RequestIds],
   )
-  const activeRequestLines = activeLines.filter((line) => line.requestId === activeRequestId)
+  const replenishmentOperations = useMemo(() => {
+    if (!allActiveLines.length) return []
+
+    const outOfStockCount = allActiveLines.filter((line) => line.currentStock <= 0).length
+    const belowMinimumCount = allActiveLines.length - outOfStockCount
+    const createdAt = allActiveLines.reduce(
+      (latest, line) => (new Date(line.createdAt).getTime() > new Date(latest).getTime() ? line.createdAt : latest),
+      allActiveLines[0].createdAt,
+    )
+
+    return [
+      {
+        key: 'stock-deficit',
+        title: 'Складской список пополнения',
+        subtitle: `${outOfStockCount} отсутствует, ${belowMinimumCount} ниже минимума. Строки собраны по остаткам, без разделения на заявки кабинетов.`,
+        sourceLabel: 'Контроль остатков',
+        createdAt,
+        lines: allActiveLines,
+      },
+    ]
+  }, [allActiveLines])
+  const selectedOperation = replenishmentOperations.find((operation) => operation.key === selectedOperationKey)
+  const selectedOperationRequestId = selectedOperationKey?.startsWith('request:')
+    ? selectedOperationKey.replace('request:', '')
+    : undefined
+  const activeLines = useMemo(
+    () => {
+      if (!selectedOperationKey) return []
+
+      if (selectedOperationKey === 'stock-deficit') return allActiveLines
+
+      if (selectedOperationRequestId) {
+        return allActiveLines.filter((line) => line.requestId === selectedOperationRequestId)
+      }
+
+      return allActiveLines.filter((line) => (line.requestId ? `request:${line.requestId}` : 'manual') === selectedOperationKey)
+    },
+    [allActiveLines, selectedOperationKey, selectedOperationRequestId],
+  )
   const orderReadyLines = activeLines.filter((line) => line.includedInOrder !== false && ['available', 'partially-available', 'alternative-selected', 'ready-to-order'].includes(line.availabilityStatus))
   const readyCount = orderReadyLines.length
   const problemLines = activeLines.filter((line) => line.availabilityStatus === 'not-available-from-approved-suppliers')
@@ -129,6 +234,13 @@ export function ReplenishmentPage() {
     }
   }, [])
 
+  useEffect(() => {
+    if (selectedOperationKey && !selectedOperation) {
+      setSelectedOperationKey(null)
+      setWorkflowStage('inquiry')
+    }
+  }, [selectedOperation, selectedOperationKey])
+
   function supplierName(id?: string) {
     return suppliers.find((supplier) => supplier.id === id)?.name ?? '—'
   }
@@ -145,15 +257,195 @@ export function ReplenishmentPage() {
 
     setIsFormingOrder(true)
     formingTimerRef.current = window.setTimeout(() => {
-      formSupplierOrders()
+      formSupplierOrders(orderReadyLines.map((line) => line.id))
       setIsFormingOrder(false)
       setOrderReadyModalOpen(true)
-    }, 1200)
+    }, 2000)
   }
 
-  function handlePrepareInquiry(supplierId: string, lineIds: string[]) {
-    prepareReplenishmentInquiry(supplierId, lineIds)
-    setDownloadHintSupplierId(supplierId)
+  function handleDownloadSupplierInquiryExcel(group: (typeof supplierInquiryGroups)[number]) {
+    const rows = group.rows
+      .map((row) => ({
+        supplier: group.supplierName,
+        email: group.supplierEmail ?? '',
+        itemName: row.item.fullName,
+        category: row.item.category,
+        quantity: row.quantity,
+        unit: row.item.unit,
+        packageLabel: row.item.packageLabel,
+        reason: replenishmentSourceLabels[row.line.source],
+        currentStock: row.line.currentStock,
+        minStock: row.line.minStock,
+      }))
+      .sort((left, right) => left.supplier.localeCompare(right.supplier, 'ru') || left.itemName.localeCompare(right.itemName, 'ru'))
+
+    if (!rows.length) return
+
+    const inquiryDate = new Intl.DateTimeFormat('ru-RU').format(new Date())
+    const fileDate = new Date().toISOString().slice(0, 10)
+    const htmlRows = rows
+      .map(
+        (row, index) => `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(row.supplier)}</td>
+            <td>${escapeHtml(row.email)}</td>
+            <td>${escapeHtml(row.itemName)}</td>
+            <td>${escapeHtml(row.category)}</td>
+            <td>${escapeHtml(row.quantity)}</td>
+            <td>${escapeHtml(row.unit)}</td>
+            <td>${escapeHtml(row.packageLabel)}</td>
+            <td>${escapeHtml(row.reason)}</td>
+            <td>${escapeHtml(row.currentStock)}</td>
+            <td>${escapeHtml(row.minStock)}</td>
+            <td></td>
+            <td></td>
+          </tr>
+        `,
+      )
+      .join('')
+
+    const html = `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            body { font-family: Arial, sans-serif; color: #0f172a; }
+            h1 { font-size: 20px; margin: 0 0 6px; }
+            .meta { margin: 0 0 16px; color: #475569; font-size: 12px; }
+            table { border-collapse: collapse; width: 100%; }
+            th { background: #eff6ff; color: #1e3a8a; font-weight: 700; }
+            th, td { border: 1px solid #cbd5e1; padding: 6px 8px; font-size: 12px; vertical-align: top; }
+          </style>
+        </head>
+        <body>
+          <h1>Запрос наличия поставщику ${escapeHtml(group.supplierName)}</h1>
+          <p class="meta">УльтраМед Снабжение · ${escapeHtml(inquiryDate)} · позиций: ${rows.length}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Поставщик</th>
+                <th>Email</th>
+                <th>Наименование</th>
+                <th>Раздел</th>
+                <th>Количество</th>
+                <th>Ед.</th>
+                <th>Упаковка</th>
+                <th>Причина</th>
+                <th>Остаток</th>
+                <th>Мин.</th>
+                <th>Есть в наличии</th>
+                <th>Комментарий поставщика</th>
+              </tr>
+            </thead>
+            <tbody>${htmlRows}</tbody>
+          </table>
+        </body>
+      </html>
+    `
+
+    downloadExcelFile(`ultramed-availability-${group.supplierId}-${fileDate}.xls`, html)
+    prepareReplenishmentInquiry(group.supplierId, group.rows.map((row) => row.line.id))
+    setDownloadHintSupplierId(group.supplierId)
+  }
+
+  function handleDownloadOrderExcel() {
+    if (!orderReadyLines.length) return
+
+    const orderDate = new Intl.DateTimeFormat('ru-RU').format(new Date())
+    const fileDate = new Date().toISOString().slice(0, 10)
+    const rows = orderReadyLines
+      .map((line, index) => {
+        const item = catalog.find((candidate) => candidate.id === line.itemId)
+        const quantity = line.recommendedQuantity > 0
+          ? line.recommendedQuantity
+          : Math.max(line.desiredStock - line.currentStock, line.minStock - line.currentStock, 1)
+        const priceWithVat = fallbackPriceWithVat(item)
+
+        return {
+          index: index + 1,
+          supplier: supplierName(line.selectedSupplierId),
+          itemName: item?.fullName ?? 'Позиция',
+          category: item?.category ?? '',
+          quantity,
+          unit: item?.unit ?? '',
+          packageLabel: item?.packageLabel ?? '',
+          reason: replenishmentSourceLabels[line.source],
+          currentStock: line.currentStock,
+          minStock: line.minStock,
+          priceWithVat,
+          vat: priceWithVat ? priceWithVat - priceWithVat / (1 + vatRate) : 0,
+          totalWithVat: priceWithVat * quantity,
+        }
+      })
+      .sort((left, right) => left.supplier.localeCompare(right.supplier, 'ru') || left.itemName.localeCompare(right.itemName, 'ru'))
+
+    const htmlRows = rows
+      .map(
+        (row) => `
+          <tr>
+            <td>${row.index}</td>
+            <td>${escapeHtml(row.supplier)}</td>
+            <td>${escapeHtml(row.itemName)}</td>
+            <td>${escapeHtml(row.category)}</td>
+            <td>${escapeHtml(row.quantity)}</td>
+            <td>${escapeHtml(row.unit)}</td>
+            <td>${escapeHtml(row.packageLabel)}</td>
+            <td>${escapeHtml(row.reason)}</td>
+            <td>${escapeHtml(row.priceWithVat)}</td>
+            <td>${escapeHtml(row.vat)}</td>
+            <td>${escapeHtml(row.totalWithVat)}</td>
+            <td>${escapeHtml(row.currentStock)}</td>
+            <td>${escapeHtml(row.minStock)}</td>
+          </tr>
+        `,
+      )
+      .join('')
+
+    const html = `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            body { font-family: Arial, sans-serif; color: #0f172a; }
+            h1 { font-size: 20px; margin: 0 0 6px; }
+            .meta { margin: 0 0 16px; color: #475569; font-size: 12px; }
+            table { border-collapse: collapse; width: 100%; }
+            th { background: #ecfdf5; color: #064e3b; font-weight: 700; }
+            th, td { border: 1px solid #cbd5e1; padding: 6px 8px; font-size: 12px; vertical-align: top; }
+          </style>
+        </head>
+        <body>
+          <h1>Заказ поставщикам</h1>
+          <p class="meta">УльтраМед Снабжение · ${escapeHtml(orderDate)} · позиций: ${rows.length}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>№</th>
+                <th>Поставщик</th>
+                <th>Наименование</th>
+                <th>Раздел</th>
+                <th>Количество</th>
+                <th>Ед.</th>
+                <th>Упаковка</th>
+                <th>Причина</th>
+                <th>Цена с НДС</th>
+                <th>НДС за ед.</th>
+                <th>Сумма с НДС</th>
+                <th>Остаток</th>
+                <th>Мин.</th>
+              </tr>
+            </thead>
+            <tbody>${htmlRows}</tbody>
+          </table>
+        </body>
+      </html>
+    `
+
+    downloadExcelFile(`ultramed-order-${fileDate}.xls`, html)
   }
 
   function markAvailable(
@@ -193,75 +485,154 @@ export function ReplenishmentPage() {
   }
 
   return (
-    <PageTransition className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
+    <PageTransition className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4">
       <Panel>
         <SectionHeader
           title="Пополнение"
           subtitle={
-            activeRequest
-              ? `Дефицит и докупка после обработки заявки ${activeRequest.id}: ${activeRequest.title?.replace(/_/g, ' ')}.`
-              : 'Дефицитные позиции, рекомендованное количество и проверка наличия у поставщиков.'
+            selectedOperation
+              ? `${selectedOperation.sourceLabel}: ${selectedOperation.subtitle}`
+              : 'Активных позиций ниже минимума или без остатка пока нет.'
           }
         />
-        <div className="mt-4 grid gap-2 md:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => setWorkflowStage('inquiry')}
-            className={cn(
-              'rounded-md border px-4 py-3 text-left transition',
-              workflowStage === 'inquiry'
-                ? 'border-emerald-300 bg-emerald-50 text-emerald-950 shadow-sm'
-                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
-            )}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-normal uppercase tracking-wide">1. Проверка наличия</span>
-              <StatusPill tone={waitingResponseCount ? 'warning' : inquiryNeededCount ? 'info' : 'success'}>
-                {inquiryNeededCount ? `${inquiryNeededCount} не проверено` : waitingResponseCount ? `${waitingResponseCount} ждут` : 'готово'}
-              </StatusPill>
-            </div>
-            <div className="mt-1 text-sm text-slate-500">Подготовить Excel-запрос, отправить поставщику вручную и внести ответ.</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => setWorkflowStage('order')}
-            className={cn(
-              'rounded-md border px-4 py-3 text-left transition',
-              workflowStage === 'order'
-                ? 'border-emerald-300 bg-emerald-50 text-emerald-950 shadow-sm'
-                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
-            )}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-normal uppercase tracking-wide">2. Формирование заказа</span>
-              <StatusPill tone={readyCount ? 'success' : 'neutral'}>{readyCount ? `${readyCount} подтверждено` : 'нет строк'}</StatusPill>
-            </div>
-            <div className="mt-1 text-sm text-slate-500">В заказ попадают только позиции с подтвержденным наличием.</div>
-          </button>
-        </div>
+        {selectedOperation ? (
+          <div className="mt-4 grid gap-2 md:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setWorkflowStage('inquiry')}
+              className={cn(
+                'rounded-md border px-4 py-3 text-left transition',
+                workflowStage === 'inquiry'
+                  ? 'border-emerald-300 bg-emerald-50 text-emerald-950 shadow-sm'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
+              )}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-normal uppercase tracking-wide">1. Проверка наличия</span>
+                <StatusPill tone={waitingResponseCount ? 'warning' : inquiryNeededCount ? 'info' : 'success'}>
+                  {inquiryNeededCount ? `${inquiryNeededCount} не проверено` : waitingResponseCount ? `${waitingResponseCount} ждут` : 'готово'}
+                </StatusPill>
+              </div>
+              <div className="mt-1 text-sm text-slate-500">Подготовить Excel-запрос, отправить поставщику вручную и внести ответ.</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setWorkflowStage('order')}
+              className={cn(
+                'rounded-md border px-4 py-3 text-left transition',
+                workflowStage === 'order'
+                  ? 'border-emerald-300 bg-emerald-50 text-emerald-950 shadow-sm'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
+              )}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-normal uppercase tracking-wide">2. Формирование заказа</span>
+                <StatusPill tone={readyCount ? 'success' : 'neutral'}>{readyCount ? `${readyCount} подтверждено` : 'нет строк'}</StatusPill>
+              </div>
+              <div className="mt-1 text-sm text-slate-500">В заказ попадают только позиции с подтвержденным наличием.</div>
+            </button>
+          </div>
+        ) : null}
       </Panel>
 
+      {!selectedOperation ? (
+        <Panel className="overflow-hidden p-0">
+          {replenishmentOperations.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[860px] border-separate border-spacing-0">
+                <thead>
+                  <tr>
+                    <th className={headerCell}>Список</th>
+                    <th className={headerCell}>Основание</th>
+                    <th className={headerCell}>Позиций к пополнению</th>
+                    <th className={headerCell}>Не проверено</th>
+                    <th className={headerCell}>Готово к заказу</th>
+                    <th className={headerCell}>Дата</th>
+                    <th className={headerCell}>Действие</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {replenishmentOperations.map((operation, index) => {
+                    const unchecked = operation.lines.filter((line) => line.availabilityStatus === 'not-checked').length
+                    const ready = operation.lines.filter((line) =>
+                      line.includedInOrder !== false &&
+                      ['available', 'partially-available', 'alternative-selected', 'ready-to-order'].includes(line.availabilityStatus),
+                    ).length
+                    return (
+                      <tr
+                        key={operation.key}
+                        className={cn('cursor-pointer transition hover:bg-slate-100/70', index % 2 ? 'bg-white' : 'bg-slate-50/35')}
+                        onClick={() => setSelectedOperationKey(operation.key)}
+                      >
+                        <td className={tableCell}>
+                          <div className="flex min-w-0 items-start gap-2">
+                            <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
+                              <PackagePlus size={17} />
+                            </span>
+                            <div className="min-w-0">
+                              <div className="font-normal text-slate-950">{operation.title}</div>
+                              <div className="mt-0.5 truncate text-xs text-slate-500">{operation.subtitle}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className={tableCell}>{operation.sourceLabel}</td>
+                        <td className={cn(tableCell, 'text-center text-slate-950')}>
+                          {operation.lines.length}
+                        </td>
+                        <td className={cn(tableCell, 'text-center')}>{unchecked}</td>
+                        <td className={cn(tableCell, 'text-center')}>{ready}</td>
+                        <td className={tableCell}>{formatDateTime(operation.createdAt)}</td>
+                        <td className={cn(tableCell, 'text-center')}>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setSelectedOperationKey(operation.key)
+                            }}
+                            className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-emerald-700 bg-emerald-700 px-3 text-sm text-white transition hover:bg-emerald-800"
+                          >
+                            Открыть
+                            <ArrowRight size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState className="m-3">Активных позиций для пополнения нет. Они появятся, когда остаток станет ниже минимума или позиция закончится на складе.</EmptyState>
+          )}
+        </Panel>
+      ) : (
       <Panel className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] overflow-hidden p-0">
         {tableLines.length ? (
           <div className="h-full overflow-auto">
-            <table className="w-full min-w-[1320px] border-separate border-spacing-0">
+            <table className="w-full min-w-[1580px] border-separate border-spacing-0">
               <colgroup>
-                <col className="w-[29%]" />
-                <col className="w-[12%]" />
-                <col className="w-[5%]" />
-                <col className="w-[5%]" />
-                <col className="w-[12%]" />
-                <col className="w-[18%]" />
-                <col className="w-[12%]" />
+                <col className="w-[3%]" />
+                <col className="w-[24%]" />
+                <col className="w-[4%]" />
+                <col className="w-[4%]" />
+                <col className="w-[10%]" />
+                <col className="w-[8%]" />
                 <col className="w-[7%]" />
+                <col className="w-[8%]" />
+                <col className="w-[16%]" />
+                <col className="w-[7%]" />
+                <col className="w-[5%]" />
               </colgroup>
               <thead>
                 <tr>
+                  <th className={headerCell}>№</th>
                   <th className={headerCell}>Позиция</th>
-                  <th className={headerCell}>Причина</th>
                   <th className={headerCell}>Остаток</th>
                   <th className={headerCell}>Мин.</th>
                   <th className={headerCell}>Закупка</th>
+                  <th className={headerCell}>Цена с НДС</th>
+                  <th className={headerCell}>НДС за ед.</th>
+                  <th className={headerCell}>Сумма с НДС</th>
                   <th className={headerCell}>Поставщик</th>
                   <th className={headerCell}>Наличие</th>
                   <th className={headerCell}>В заказ</th>
@@ -271,29 +642,42 @@ export function ReplenishmentPage() {
                 {tableLines.map((line, index) => {
                   const item = catalog.find((candidate) => candidate.id === line.itemId)
                   const allowedSuppliers = allowedSupplierIdsForItem(item)
-                  const active = line.requestId === activeRequestId
+                  const noStock = line.currentStock <= 0
+                  const belowMinimum = line.currentStock < line.minStock
                   const minPurchaseQuantity = Math.max(line.minStock - line.currentStock, 0)
                   const selectedSupplierId =
                     !allowedSuppliers.includes(line.selectedSupplierId)
                       ? clinicMainSupplierId
                       : line.selectedSupplierId
                   const selectedMainSupplier = selectedSupplierId === clinicMainSupplierId
+                  const purchaseQuantity = line.recommendedQuantity > 0
+                    ? line.recommendedQuantity
+                    : Math.max(line.desiredStock - line.currentStock, line.minStock - line.currentStock, 1)
+                  const priceWithVat = fallbackPriceWithVat(item)
+                  const vatPerUnit = priceWithVat ? priceWithVat - priceWithVat / (1 + vatRate) : 0
+                  const totalWithVat = priceWithVat * purchaseQuantity
 
                   return (
                     <tr
                       key={line.id}
                       className={cn(
                         'transition hover:bg-slate-100/70',
-                        active ? 'bg-amber-50/80' : index % 2 ? 'bg-white' : 'bg-slate-50/35',
+                        noStock && 'bg-rose-50/90 hover:bg-rose-100/70',
+                        !noStock && belowMinimum && 'bg-amber-50/80 hover:bg-amber-100/70',
+                        !noStock && !belowMinimum && (index % 2 ? 'bg-white' : 'bg-slate-50/35'),
                       )}
                     >
+                      <td className={cn(tableCell, 'text-center text-xs text-slate-500')}>{index + 1}</td>
                       <td className={tableCell}>
                         <div className="whitespace-normal break-words text-slate-950">{item?.fullName ?? 'Позиция'}</div>
                         <div className="mt-0.5 text-[10px] leading-3 text-slate-500">
-                          {item?.category} · {item?.unit} · {item?.packageLabel}
+                          {item?.category}
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-1 text-[10px] leading-3">
+                          {noStock ? <span className="rounded bg-rose-100 px-1.5 py-0.5 text-rose-800">нет на складе</span> : null}
+                          {belowMinimum && !noStock ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">ниже минимума</span> : null}
                         </div>
                       </td>
-                      <td className={tableCell}>{replenishmentSourceLabels[line.source]}</td>
                       <td className={cn(tableCell, 'text-center text-slate-950')}>{formatNumber(line.currentStock)}</td>
                       <td className={cn(tableCell, 'text-center')}>{formatNumber(line.minStock)}</td>
                       <td className={tableCell}>
@@ -322,6 +706,9 @@ export function ReplenishmentPage() {
                           </button>
                         </div>
                       </td>
+                      <td className={cn(tableCell, 'whitespace-nowrap text-right')}>{priceWithVat ? formatMoney(priceWithVat) : '-'}</td>
+                      <td className={cn(tableCell, 'whitespace-nowrap text-right')}>{vatPerUnit ? formatMoney(vatPerUnit) : '-'}</td>
+                      <td className={cn(tableCell, 'whitespace-nowrap text-right text-slate-950')}>{totalWithVat ? formatMoney(totalWithVat) : '-'}</td>
                       <td
                         className={cn(
                           tableCell,
@@ -455,7 +842,7 @@ export function ReplenishmentPage() {
           <EmptyState className="m-3">
             {workflowStage === 'order'
               ? 'Подтвержденных позиций для заказа пока нет. Сначала проверьте наличие и отметьте строки как доступные.'
-              : 'Активных строк пополнения нет. Они появятся после частичной выдачи или отметки дефицита в заявке.'}
+              : 'Активных строк пополнения нет. Они появятся по складскому дефициту или отсутствию товара.'}
           </EmptyState>
         )}
         {workflowStage === 'inquiry' ? (
@@ -491,46 +878,40 @@ export function ReplenishmentPage() {
 
           <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <span className="text-xs text-slate-500">Excel-запросы:</span>
               {supplierInquiryGroups.length ? (
                 supplierInquiryGroups.map((group) => {
                   const active = downloadHintSupplierId === group.supplierId
                   const mainSupplier = group.supplierId === clinicMainSupplierId
+                  const hasMultipleSuppliers = supplierInquiryGroups.length > 1
 
                   return (
                     <button
                       key={group.supplierId}
                       type="button"
-                      onClick={() => handlePrepareInquiry(group.supplierId, group.rows.map((row) => row.line.id))}
+                      onClick={() => handleDownloadSupplierInquiryExcel(group)}
                       className={cn(
-                        'group inline-flex min-h-10 items-center gap-2 rounded-md border px-3 text-sm font-normal shadow-sm transition-all',
+                        'group inline-flex min-h-11 max-w-full items-center gap-2 rounded-md border border-sky-600 bg-[linear-gradient(135deg,#0284c7_0%,#0ea5e9_48%,#38bdf8_100%)] px-4 text-sm font-normal text-white shadow-[0_12px_28px_rgba(14,165,233,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(14,165,233,0.30)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-700/25',
                         active
-                          ? 'min-w-[252px] justify-center border-emerald-300 bg-emerald-50 text-emerald-900 shadow-[0_8px_18px_rgba(16,185,129,0.12)]'
-                          : 'border-emerald-100 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800',
+                          ? 'ring-2 ring-emerald-400/45'
+                          : '',
                       )}
-                      title={`Скачать таблицу для письма поставщику ${group.supplierName}`}
+                      title={`Скачать Excel-файл запроса наличия для ${group.supplierName}`}
                     >
-                      <span
-                        className={cn(
-                          'inline-flex size-6 items-center justify-center rounded bg-emerald-600 text-white transition',
-                          active ? 'bg-emerald-700' : 'group-hover:bg-emerald-700',
-                        )}
-                      >
-                        <FileSpreadsheet size={15} />
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded bg-white/18">
+                        <FileSpreadsheet size={17} />
                       </span>
-                      {active ? (
-                        'Запрос подготовлен, ожидаем ответ'
-                      ) : (
-                        <span className="min-w-0 text-left">
-                          <span className="flex min-w-0 items-center gap-1.5">
-                            <span className="truncate">{group.supplierName}</span>
-                            {mainSupplier ? <span className={supplierBadgeClass}>основной</span> : null}
-                          </span>
-                          <span className="block text-[10px] leading-3 text-slate-500">
-                            {group.rows.length} поз. в Excel-запрос{group.supplierEmail ? ` · ${group.supplierEmail}` : ''}
-                          </span>
+                      <span className="grid min-w-0 text-left leading-tight">
+                        <span className="truncate">
+                          {hasMultipleSuppliers ? `Скачать Excel: ${group.supplierName}` : 'Скачать Excel наличия'}
                         </span>
-                      )}
+                        <span className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] text-sky-50">
+                          {!hasMultipleSuppliers ? <span className="truncate">{group.supplierName}</span> : null}
+                          {mainSupplier ? <span className="rounded bg-white/18 px-1.5 py-0.5 text-[9px] uppercase tracking-wide">основной</span> : null}
+                          <span>{group.rows.length} позиций</span>
+                          {active ? <span>запрос подготовлен</span> : null}
+                        </span>
+                      </span>
+                      <Download size={16} className="shrink-0" />
                     </button>
                   )
                 })
@@ -539,7 +920,7 @@ export function ReplenishmentPage() {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-              <span>Из активной заявки: <span className="text-slate-950">{activeRequestLines.length}</span></span>
+              <span>В пополнении: <span className="text-slate-950">{activeLines.length}</span></span>
               <span>Не проверено: <span className="text-slate-950">{inquiryNeededCount}</span></span>
               <span>Ждем ответ: <span className="text-slate-950">{waitingResponseCount}</span></span>
               <span>Готово к заказу: <span className="text-slate-950">{readyCount}</span></span>
@@ -580,29 +961,48 @@ export function ReplenishmentPage() {
               <span>Не проверено: <span className="text-slate-950">{inquiryNeededCount}</span></span>
               <span>Ждем ответ: <span className="text-slate-950">{waitingResponseCount}</span></span>
             </div>
-            <button
-              type="button"
-              onClick={handleFormOrders}
-              disabled={isFormingOrder || !readyCount}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-emerald-700 bg-emerald-700 px-3 text-sm font-normal text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/20 disabled:pointer-events-none disabled:opacity-70"
-              title={readyCount ? 'Сформировать заказ по подтвержденным строкам' : 'Сначала отметьте наличие по ответу поставщика'}
-            >
-              {isFormingOrder ? (
-                <>
-                  <Loader2 size={15} className="animate-spin" />
-                  Формирование
-                </>
-              ) : (
-                <>
-                  Сформировать заказ
-                  <ArrowRight size={15} />
-                </>
-              )}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleDownloadOrderExcel}
+                disabled={!readyCount}
+                className="inline-flex min-h-11 items-center gap-2 rounded-md border border-emerald-600 bg-[linear-gradient(135deg,#059669_0%,#10b981_48%,#34d399_100%)] px-4 text-sm font-normal text-white shadow-[0_12px_28px_rgba(5,150,105,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(5,150,105,0.30)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/25 disabled:pointer-events-none disabled:opacity-60"
+                title={readyCount ? 'Скачать Excel-файл заказа по подтвержденным строкам' : 'Сначала отметьте наличие по ответу поставщика'}
+              >
+                <span className="flex size-7 items-center justify-center rounded bg-white/18">
+                  <FileSpreadsheet size={17} />
+                </span>
+                <span className="grid text-left leading-tight">
+                  <span>Скачать Excel заказа</span>
+                  <span className="text-[11px] text-emerald-50">{readyCount} позиций</span>
+                </span>
+                <Download size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={handleFormOrders}
+                disabled={isFormingOrder || !readyCount}
+                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-800 transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/20 disabled:pointer-events-none disabled:opacity-70"
+                title={readyCount ? 'Сформировать заказ по подтвержденным строкам' : 'Сначала отметьте наличие по ответу поставщика'}
+              >
+                {isFormingOrder ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    Формирование
+                  </>
+                ) : (
+                  <>
+                    Сформировать заказ
+                    <ArrowRight size={15} />
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
         )}
       </Panel>
+      )}
 
       {problemLines.length ? (
         <Panel>
@@ -617,15 +1017,7 @@ export function ReplenishmentPage() {
       ) : null}
 
       {isFormingOrder ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-5 text-center shadow-2xl">
-            <Loader2 className="mx-auto animate-spin text-emerald-700" size={34} />
-            <div className="mt-3 text-xl font-normal text-slate-950">Формирование заказа</div>
-            <div className="mt-2 text-sm leading-5 text-slate-500">
-              Группируем позиции по поставщикам, подтягиваем количества и цены.
-            </div>
-          </div>
-        </div>
+        <BrandedLoadingModal title="Формируем заказ поставщикам" />
       ) : null}
 
       {orderReadyModalOpen ? (

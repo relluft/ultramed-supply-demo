@@ -26,7 +26,7 @@ export function Button({
 }
 
 export function Panel({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('rounded-lg border border-slate-200 bg-white p-4 shadow-sm', className)} {...props} />
+  return <div className={cn('rounded-lg border border-slate-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.035)]', className)} {...props} />
 }
 
 export function SectionHeader({
@@ -90,6 +90,6 @@ export const fieldStyles =
   'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10'
 
 export const tableHeaderCell =
-  'border-b border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-normal uppercase tracking-wide text-slate-500'
+  'sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95 px-3 py-2 text-left text-xs font-normal uppercase tracking-wide text-slate-500 backdrop-blur'
 
-export const tableCell = 'border-b border-slate-100 px-3 py-2 align-top text-sm text-slate-700'
+export const tableCell = 'border-b border-slate-100 px-3 py-2 align-top text-sm text-slate-700 first:border-l-[3px] first:border-l-transparent'
