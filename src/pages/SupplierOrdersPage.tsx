@@ -152,7 +152,7 @@ export function SupplierOrdersPage() {
       <Panel>
         <SectionHeader
           title="Заказы поставщикам"
-          subtitle="Реестр сформированных заказов. Суммы указаны с НДС 20%."
+          subtitle="Реестр сформированных заказов."
           action={
             <Button onClick={() => navigate('/replenishment')}>
               К пополнению
