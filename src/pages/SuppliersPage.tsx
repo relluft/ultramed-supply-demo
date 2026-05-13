@@ -31,13 +31,13 @@ export function SuppliersPage() {
                   <div className="text-xl font-semibold text-slate-950">{supplier.name}</div>
                   <div className="mt-1 text-sm text-slate-500">{supplier.role}</div>
                 </div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-slate-50 text-emerald-700">
+                <div className="app-soft-card flex h-10 w-10 items-center justify-center rounded-md text-emerald-700">
                   <Truck size={20} />
                 </div>
               </div>
 
               <div className="grid gap-2 text-sm">
-                <div className="rounded-md border border-slate-200 p-3">
+                <div className="app-soft-card rounded-md border p-3">
                   <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Менеджер</div>
                   <div className="mt-1 font-semibold text-slate-950">{supplier.manager}</div>
                 </div>
@@ -51,12 +51,12 @@ export function SuppliersPage() {
                 </div>
               </div>
 
-              <div className="rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-600">
+              <div className="app-soft-card rounded-md p-3 text-sm leading-6 text-slate-600">
                 <div className="font-semibold text-slate-950">Условия</div>
                 {supplier.terms}
               </div>
 
-              <div className="rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-600">
+              <div className="app-soft-card rounded-md p-3 text-sm leading-6 text-slate-600">
                 <div className="font-semibold text-slate-950">Комментарий</div>
                 {supplier.comment}
               </div>

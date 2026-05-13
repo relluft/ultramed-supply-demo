@@ -1,6 +1,7 @@
-import { ArrowLeft, ChevronDown, ChevronRight, ClipboardList, Home, Plus, Search, Trash2, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Home, Plus, Search, Trash2, X } from 'lucide-react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { BrandedLoadingModal } from '../components/BrandedLoadingModal'
 import { PageTransition } from '../components/PageTransition'
 import { Button, EmptyState, Panel, SectionHeader, StatusPill, fieldStyles } from '../components/ui'
@@ -11,8 +12,15 @@ import type { CatalogItem, RequestCartLine, Room, SupplyRequest, SupplyRequestLi
 
 const orthodonticDemoRequestId = 'REQ-005'
 const requestTableHeaderCell =
-  'sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-left text-[10px] font-normal uppercase tracking-wide text-slate-500'
-const requestTableCell = 'border-b border-slate-100 border-r border-slate-100 px-2 py-1 align-middle text-xs leading-4 text-slate-700 last:border-r-0'
+  'sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95 px-3 py-2 text-left text-[11px] font-normal uppercase tracking-wide text-slate-500'
+const requestTableCell = 'border-b border-slate-100 px-3 py-2 align-top text-[13px] leading-4 text-slate-700'
+const submitLoadingMs = 1500
+
+function ModalPortal({ children }: { children: ReactNode }) {
+  if (typeof document === 'undefined') return null
+
+  return createPortal(children, document.body)
+}
 
 const catalogVariantGroups = [
   {
@@ -377,8 +385,8 @@ function ManualItemModal({
   const [comment, setComment] = useState('')
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-4 shadow-xl">
+    <div className="app-modal-backdrop z-50 flex items-center justify-center px-4 backdrop-blur-sm">
+      <div className="app-panel w-full max-w-lg rounded-lg border p-4 shadow-xl">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-lg font-normal text-slate-950">Позиция не найдена</div>
@@ -465,8 +473,8 @@ function RequestPreviewModal({
   const totalQuantity = cart.reduce((sum, line) => sum + line.quantity, 0)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4 py-6 backdrop-blur-sm">
-      <div className="flex max-h-full w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+    <div className="app-modal-backdrop z-50 flex items-center justify-center px-4 py-6 backdrop-blur-sm">
+      <div className="app-panel flex max-h-full w-full max-w-5xl flex-col overflow-hidden rounded-xl border shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
           <div>
             <div className="text-xl font-normal text-slate-950">Проверка заявки перед отправкой</div>
@@ -483,7 +491,7 @@ function RequestPreviewModal({
         </div>
 
         <div className="min-h-0 overflow-auto px-5 py-4">
-          <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-sm md:grid-cols-2 xl:grid-cols-4">
+          <div className="app-soft-card grid gap-3 rounded-lg border p-3 text-sm md:grid-cols-2 xl:grid-cols-4">
             <div>
               <div className="text-xs font-normal uppercase tracking-wide text-slate-400">Кабинет</div>
               <div className="mt-1 font-normal text-slate-950">{room ? `${room.number} · ${room.title}` : 'Кабинет не выбран'}</div>
@@ -571,6 +579,25 @@ function RequestPreviewModal({
   )
 }
 
+function RequestSubmitDoneModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="app-modal-backdrop z-[60] flex items-center justify-center px-4 py-6 backdrop-blur-sm">
+      <div className="app-panel flex w-full max-w-md flex-col items-center rounded-xl border px-7 py-7 text-center shadow-2xl">
+        <div className="flex size-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+          <CheckCircle2 size={32} />
+        </div>
+        <div className="mt-4 text-2xl font-normal text-slate-950">Готово</div>
+        <div className="mt-2 text-sm leading-6 text-slate-600">
+          Заявка отправлена старшей медсестре.
+        </div>
+        <Button className="mt-6 w-full max-w-48" onClick={onClose}>
+          Закрыть
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 function RequestCart({
   cart,
   catalog,
@@ -589,8 +616,8 @@ function RequestCart({
   const [comment, setComment] = useState('')
 
   return (
-    <Panel className="flex h-full min-h-0 flex-col p-0">
-      <div className="flex items-center justify-between gap-3">
+    <Panel className="flex h-full min-h-0 flex-col overflow-hidden p-0">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white">
         <div className="min-w-0 px-3 py-2.5">
           <div className="text-base font-normal text-slate-950">Заявка</div>
           <div className="text-xs text-slate-500">Строк: {cart.length}</div>
@@ -602,19 +629,19 @@ function RequestCart({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto border-y border-slate-200">
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         <table className="w-full table-fixed border-separate border-spacing-0">
           <colgroup>
-            <col className="w-[9%]" />
-            <col className="w-[53%]" />
-            <col className="w-[24%]" />
-            <col className="w-[14%]" />
+            <col className="w-[10%]" />
+            <col className="w-[56%]" />
+            <col className="w-[22%]" />
+            <col className="w-[12%]" />
           </colgroup>
           <thead>
             <tr>
               <th className={cn(requestTableHeaderCell, '!px-1 text-center')}>№</th>
               <th className={requestTableHeaderCell}>Наименование</th>
-              <th className={cn(requestTableHeaderCell, 'text-center')}>Кол-во</th>
+              <th className={cn(requestTableHeaderCell, 'whitespace-nowrap text-center')}>К-во</th>
               <th className={cn(requestTableHeaderCell, '!px-1 text-center')}></th>
             </tr>
           </thead>
@@ -660,8 +687,8 @@ function RequestCart({
               })
             ) : (
               <tr>
-                <td colSpan={4} className="whitespace-normal break-words px-3 py-8 text-center text-sm text-slate-500">
-                  Заявка пока пустая. Добавляйте позиции кнопками из спецификации слева.
+                <td colSpan={4} className="whitespace-normal break-words px-4 py-10 text-center text-sm leading-5 text-slate-500">
+                  Заявка пока пустая. Выберите позиции в каталоге слева.
                 </td>
               </tr>
             )}
@@ -669,7 +696,7 @@ function RequestCart({
         </table>
       </div>
 
-      <div className="grid gap-2 p-3">
+      <div className="grid gap-2 border-t border-slate-200 bg-white p-3">
         <textarea
           value={comment}
           onChange={(event) => setComment(event.target.value)}
@@ -688,6 +715,7 @@ function RequestCart({
 
 export function NurseCabinetPage() {
   const location = useLocation()
+  const navigate = useNavigate()
   const {
     state: { role, rooms, catalog, requests, carts },
     addCatalogToCart,
@@ -707,6 +735,7 @@ export function NurseCabinetPage() {
   const [isPreviewOpen, setPreviewOpen] = useState(false)
   const [previewComment, setPreviewComment] = useState('')
   const [isSubmitLoading, setSubmitLoading] = useState(false)
+  const [isSubmitDoneOpen, setSubmitDoneOpen] = useState(false)
   const [expandedGroupIds, setExpandedGroupIds] = useState<Record<string, boolean>>({})
   const [selectedHistoryRequestId, setSelectedHistoryRequestId] = useState<string | null>(null)
 
@@ -715,12 +744,14 @@ export function NurseCabinetPage() {
 
     const timer = window.setTimeout(() => {
       submitRequest(previewComment)
+      navigate('/cabinet#request', { replace: true })
       setPreviewComment('')
       setSubmitLoading(false)
-    }, 2000)
+      setSubmitDoneOpen(true)
+    }, submitLoadingMs)
 
     return () => window.clearTimeout(timer)
-  }, [isSubmitLoading, previewComment, submitRequest])
+  }, [isSubmitLoading, navigate, previewComment, submitRequest])
 
   const categories = useMemo(
     () => [
@@ -827,12 +858,17 @@ export function NurseCabinetPage() {
   }
 
   function openRequestPreview(comment: string) {
+    if (!cart.length) return
+
+    navigate('/cabinet#request', { replace: true })
+    setSubmitDoneOpen(false)
     setPreviewComment(comment)
     setPreviewOpen(true)
   }
 
   function confirmRequestSubmit() {
     setPreviewOpen(false)
+    setSubmitDoneOpen(false)
     setSubmitLoading(true)
   }
 
@@ -924,7 +960,7 @@ export function NurseCabinetPage() {
           />
         </Panel>
 
-        <section className="grid min-h-[360px] content-start gap-3 rounded-lg border border-slate-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
+        <section className="app-panel grid min-h-[360px] content-start gap-3 rounded-lg border p-4">
           <div>
             <h2 className="text-xl font-normal text-slate-950">Выберите, с чего начать</h2>
             <p className="mt-1 text-sm text-slate-500">Главная кабинета</p>
@@ -938,9 +974,9 @@ export function NurseCabinetPage() {
                 <Link
                   key={item.to}
                   to={item.to}
-                  className="group min-h-[150px] rounded-lg border border-slate-200 bg-slate-50/60 p-4 transition hover:border-emerald-200 hover:bg-emerald-50/60 hover:shadow-sm"
+                  className="app-soft-card group min-h-[150px] rounded-lg border p-4 transition hover:border-emerald-200 hover:bg-emerald-50/60 hover:shadow-sm"
                 >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-white text-emerald-800 transition group-hover:border-emerald-200">
+                  <div className="app-soft-card flex h-10 w-10 items-center justify-center rounded-md border text-emerald-800 transition group-hover:border-emerald-200">
                     <Icon size={20} />
                   </div>
                   <div className="mt-4 text-lg font-normal text-slate-950">{item.title}</div>
@@ -956,34 +992,33 @@ export function NurseCabinetPage() {
   }
 
   return (
-    <PageTransition className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden">
-      <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2">
-        <Panel className={cn('p-3', location.hash === '#request' && 'lg:ml-[194px]')}>
-          <SectionHeader
-            title={`Кабинет ${room?.number ?? ''}`}
-            subtitle={cabinetSubtitle}
-          />
-        </Panel>
-
+    <PageTransition className="h-full min-h-0 overflow-hidden">
+      <section className="h-full min-h-0">
         {location.hash !== '#my-requests' ? (
           <>
-        <div className="grid min-h-0 gap-2 lg:ml-[194px] xl:grid-cols-[minmax(860px,2.15fr)_minmax(330px,0.68fr)]">
-          <div className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-            <div className="grid gap-2 border-b border-slate-200 bg-white p-2">
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <label className="relative w-full max-w-[520px] sm:w-[460px]">
-                  <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-                  <input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    className={`${fieldStyles} h-9 py-1.5 pl-8 text-xs`}
-                    placeholder="Поиск по названию: перчатки, композит, артикаин"
-                  />
-                </label>
-                <Button variant="secondary" className="min-h-8 shrink-0 px-2 py-1 text-xs" onClick={() => openManualItem(query)}>
-                  <Plus size={14} />
-                  Позиция не найдена
-                </Button>
+        <div className="grid h-full min-h-0 gap-2 lg:ml-[194px] xl:grid-cols-[minmax(820px,1fr)_minmax(300px,360px)]">
+          <div className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <div className="grid gap-2 border-b border-slate-200 bg-white p-2.5">
+              <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+                <div className="min-w-0 shrink-0">
+                  <div className="text-base font-normal text-slate-950">Каталог материалов</div>
+                  <div className="text-xs text-slate-500">Найдено: {catalogDisplayRows.length}</div>
+                </div>
+                <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-center">
+                  <label className="relative w-full md:w-[420px] xl:w-[520px]">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                    <input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      className={`${fieldStyles} h-9 py-1.5 pl-8 text-xs`}
+                      placeholder="Поиск: перчатки, композит, артикаин"
+                    />
+                  </label>
+                  <Button variant="secondary" className="min-h-8 shrink-0 px-2 py-1 text-xs" onClick={() => openManualItem(query)}>
+                    <Plus size={14} />
+                    Позиция не найдена
+                  </Button>
+                </div>
               </div>
               {frequentItems.length ? (
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-xs">
@@ -999,8 +1034,8 @@ export function NurseCabinetPage() {
                         className={cn(
                           'shrink-0 rounded-md border px-2 py-1 transition',
                           inCart
-                            ? 'border-sky-200 bg-sky-50 text-sky-800'
-                            : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-900',
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                            : 'border-[#b9decf] bg-white/64 text-[#587367] hover:border-emerald-200 hover:bg-white hover:text-emerald-900',
                         )}
                         title={catalogItemProfessionalName(item)}
                       >
@@ -1023,7 +1058,7 @@ export function NurseCabinetPage() {
                         'shrink-0 rounded-full border px-3 py-1.5 text-xs font-normal transition',
                         active
                           ? 'border-emerald-700 bg-emerald-700 text-white shadow-sm'
-                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-900',
+                          : 'border-[#b9decf] bg-white/64 text-[#587367] hover:border-emerald-200 hover:bg-white hover:text-emerald-900',
                       )}
                     >
                       {item}
@@ -1036,20 +1071,16 @@ export function NurseCabinetPage() {
               <table className="w-full table-fixed border-separate border-spacing-0">
                 <colgroup>
                   <col className="w-[4%]" />
-                  <col className="w-[51%]" />
-                  <col className="w-[13%]" />
-                  <col className="w-[7%]" />
-                  <col className="w-[14%]" />
-                  <col className="w-[11%]" />
+                  <col className="w-[60%]" />
+                  <col className="w-[24%]" />
+                  <col className="w-[12%]" />
                 </colgroup>
               <thead>
                 <tr>
                   <th className={cn(requestTableHeaderCell, '!px-1 !text-center')}>№</th>
-                  <th className={cn(requestTableHeaderCell, '!text-center')}>Наименование</th>
-                  <th className={cn(requestTableHeaderCell, '!text-center')}>Раздел</th>
-                  <th className={cn(requestTableHeaderCell, '!text-center')}>Ед.</th>
-                  <th className={cn(requestTableHeaderCell, '!text-center')}>Упаковка</th>
-                  <th className={cn(requestTableHeaderCell, '!text-center')}>Действия</th>
+                  <th className={requestTableHeaderCell}>Наименование</th>
+                  <th className={requestTableHeaderCell}>Детали</th>
+                  <th className={cn(requestTableHeaderCell, '!px-1 !text-center')}>Действие</th>
                 </tr>
               </thead>
               <tbody>
@@ -1079,9 +1110,10 @@ export function NurseCabinetPage() {
                               </div>
                             </div>
                           </td>
-                          <td className={requestTableCell}>{getGroupCategoryLabel(row.items)}</td>
-                          <td className={cn(requestTableCell, 'text-center text-slate-500')}>-</td>
-                          <td className={requestTableCell}>Раскройте, чтобы выбрать разновидность</td>
+                          <td className={requestTableCell}>
+                            <div className="text-slate-700">{getGroupCategoryLabel(row.items)}</div>
+                            <div className="mt-0.5 text-[11px] leading-4 text-slate-500">{row.totalVariants} варианта для выбора</div>
+                          </td>
                           <td className={cn(requestTableCell, '!px-1 text-center')}>
                             <button
                               type="button"
@@ -1107,8 +1139,8 @@ export function NurseCabinetPage() {
                         className={cn(
                           'transition hover:bg-slate-100/70',
                           row.nested && 'bg-white',
-                          !row.nested && (cartLine ? 'bg-sky-100/80' : index % 2 ? 'bg-white' : 'bg-slate-50/35'),
-                          row.nested && cartLine && 'bg-sky-50/80',
+                          !row.nested && (cartLine ? 'bg-emerald-50/85' : index % 2 ? 'bg-white' : 'bg-slate-50/35'),
+                          row.nested && cartLine && 'bg-emerald-50/80',
                         )}
                       >
                         <td className={cn(requestTableCell, '!px-1 text-center text-xs text-slate-500')}>{row.nested ? '' : index + 1}</td>
@@ -1118,14 +1150,10 @@ export function NurseCabinetPage() {
                               <div className="whitespace-normal break-words font-normal text-slate-950" title={catalogItemProfessionalName(item)}>
                                 {catalogItemProfessionalName(item)}
                               </div>
-                              {row.nested ? (
-                                <div className="mt-0.5 text-[11px] leading-4 text-slate-500">{item.category}, {item.unit}</div>
-                              ) : null}
+                              <div className="mt-0.5 text-[11px] leading-4 text-slate-500">{item.category} · ед.: {item.unit}</div>
                             </div>
                           </div>
                         </td>
-                        <td className={requestTableCell}>{item.category}</td>
-                        <td className={cn(requestTableCell, 'text-center')}>{item.unit}</td>
                         <td className={requestTableCell}>{item.packageLabel}</td>
                         <td className={cn(requestTableCell, '!px-1 whitespace-nowrap text-center')}>{renderCatalogItemAction(item)}</td>
                       </tr>
@@ -1165,7 +1193,7 @@ export function NurseCabinetPage() {
         ) : null}
 
         {location.hash === '#my-requests' ? (
-        <Panel id="my-requests" className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden p-0">
+        <Panel id="my-requests" className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden p-0">
           <div className="flex flex-col gap-2 border-b border-slate-200 p-3 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -1321,24 +1349,37 @@ export function NurseCabinetPage() {
         ) : null}
       </section>
       {isManualOpen ? (
-        <ManualItemModal
-          key={manualInitialName || 'empty-manual-item'}
-          initialName={manualInitialName}
-          onClose={() => setManualOpen(false)}
-          onAdd={(name, quantity, comment) => addManualLineToCart(name, quantity, comment)}
-        />
+        <ModalPortal>
+          <ManualItemModal
+            key={manualInitialName || 'empty-manual-item'}
+            initialName={manualInitialName}
+            onClose={() => setManualOpen(false)}
+            onAdd={(name, quantity, comment) => addManualLineToCart(name, quantity, comment)}
+          />
+        </ModalPortal>
       ) : null}
       {isPreviewOpen ? (
-        <RequestPreviewModal
-          cart={cart}
-          catalog={catalog}
-          room={room}
-          comment={previewComment}
-          onClose={() => setPreviewOpen(false)}
-          onConfirm={confirmRequestSubmit}
-        />
+        <ModalPortal>
+          <RequestPreviewModal
+            cart={cart}
+            catalog={catalog}
+            room={room}
+            comment={previewComment}
+            onClose={() => setPreviewOpen(false)}
+            onConfirm={confirmRequestSubmit}
+          />
+        </ModalPortal>
       ) : null}
-      {isSubmitLoading ? <BrandedLoadingModal title="Формируем заявку" /> : null}
+      {isSubmitLoading ? (
+        <ModalPortal>
+          <BrandedLoadingModal title="Формируем заявку" durationSeconds={submitLoadingMs / 1000} />
+        </ModalPortal>
+      ) : null}
+      {isSubmitDoneOpen ? (
+        <ModalPortal>
+          <RequestSubmitDoneModal onClose={() => setSubmitDoneOpen(false)} />
+        </ModalPortal>
+      ) : null}
     </PageTransition>
   )
 }

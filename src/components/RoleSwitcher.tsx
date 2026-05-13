@@ -34,7 +34,7 @@ export function RoleSwitcher({
   }
 
   return (
-    <div className={cn('flex flex-wrap gap-1 rounded-md border border-slate-200 bg-slate-50 p-1', compact && 'max-w-full')}>
+    <div className={cn('app-soft-card flex flex-wrap gap-1 rounded-md border p-1', compact && 'max-w-full')}>
       {roles.map((item) => {
         const active = currentRole === item
         const Icon = item === 'senior-nurse' ? UsersRound : item === 'manager' ? BriefcaseBusiness : UserRound
@@ -46,7 +46,7 @@ export function RoleSwitcher({
             onClick={() => handleSelect(item)}
             className={cn(
               'inline-flex min-h-8 items-center gap-1.5 rounded px-2.5 py-1 text-sm font-semibold transition',
-              active ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950',
+              active ? 'bg-slate-100 text-slate-950 ring-1 ring-inset ring-slate-300' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950',
             )}
           >
             <Icon size={15} />

@@ -146,7 +146,7 @@ export function StockPage() {
       </Panel>
 
       <Panel className="overflow-hidden p-0">
-        <div className="grid gap-2 border-b border-slate-200 bg-slate-50/70 px-3 py-2 md:grid-cols-[1fr_1fr_1.2fr_1fr_1fr_auto]">
+        <div className="app-section-band grid gap-2 border-b border-slate-200 px-3 py-2 md:grid-cols-[1fr_1fr_1.2fr_1fr_1fr_auto]">
           <div>
             <div className="text-xs uppercase tracking-wide text-slate-500">Всего позиций</div>
             <div className="text-lg font-normal text-slate-950">{formatNumber(stockMetrics.total)}</div>
@@ -160,7 +160,7 @@ export function StockPage() {
             <select
               value={categoryFilter}
               onChange={(event) => setCategoryFilter(event.target.value)}
-              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
+              className="app-field h-8 rounded-md border px-2 text-xs text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
             >
               <option value="all">Все категории</option>
               {categories.map((category) => (
@@ -174,7 +174,7 @@ export function StockPage() {
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Название, упаковка, поставщик"
-              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
+              className="app-field h-8 rounded-md border px-2 text-xs text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
             />
           </label>
           <label className="grid gap-1 text-xs text-slate-500">
@@ -182,7 +182,7 @@ export function StockPage() {
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value as 'all' | StockStatus)}
-              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
+              className="app-field h-8 rounded-md border px-2 text-xs text-slate-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
             >
               <option value="all">Все состояния</option>
               <option value="enough">Достаточно</option>
@@ -293,7 +293,7 @@ export function StockPage() {
         />
       ) : null}
       {toastMessage ? (
-        <div className="fixed bottom-5 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-center gap-3 rounded-lg border border-emerald-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-[0_18px_42px_rgba(15,23,42,0.18)]">
+        <div className="app-soft-card fixed bottom-5 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-center gap-3 rounded-lg border px-4 py-3 text-sm text-slate-800">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
             <CheckCircle2 size={20} />
           </span>
@@ -328,7 +328,7 @@ function StockItemDrawer({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-y-0 right-0 z-40 w-full max-w-xl border-l border-slate-200 bg-white p-4 shadow-xl">
+    <div className="app-workspace-bg fixed inset-y-0 right-0 z-40 w-full max-w-xl border-l border-white/70 p-4 shadow-xl">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xl font-semibold text-slate-950">{item.shortName}</div>
@@ -354,14 +354,14 @@ function StockItemDrawer({
           ['Основной поставщик', primarySupplier],
           ['Альтернативы', alternativeSuppliers.join(', ') || '—'],
         ].map(([label, value]) => (
-          <div key={label} className="rounded-md border border-slate-200 p-3">
+          <div key={label} className="app-soft-card rounded-md border p-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</div>
             <div className="mt-1 font-semibold text-slate-950">{value}</div>
           </div>
         ))}
       </div>
 
-      <div className="mt-3 rounded-md border border-slate-200 p-3 text-sm text-slate-600">
+      <div className="app-soft-card mt-3 rounded-md border p-3 text-sm text-slate-600">
         <div className="font-semibold text-slate-950">Комментарий старшей медсестры</div>
         <div className="mt-1">{item.seniorComment ?? 'Комментарий не задан.'}</div>
         {item.requiresApprovalForReplacement ? (
@@ -374,7 +374,7 @@ function StockItemDrawer({
         <div className="mt-2 grid gap-2">
           {movementEvents.length ? (
             movementEvents.map((event) => (
-              <div key={event.id} className="rounded-md border border-slate-200 p-3 text-sm">
+              <div key={event.id} className="app-soft-card rounded-md border p-3 text-sm">
                 <div className="font-semibold text-slate-950">{event.title}</div>
                 <div className="mt-1 text-slate-500">{event.description}</div>
                 <div className="mt-2 text-xs text-slate-400">{formatDateTime(event.createdAt)}</div>

@@ -1,5 +1,6 @@
 import { ArrowRight, Check, ChevronDown, ClipboardCheck, Download, FileSpreadsheet, Loader2, Mail, PackagePlus, Reply } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { BrandedLoadingModal } from '../components/BrandedLoadingModal'
 import { PageTransition } from '../components/PageTransition'
@@ -18,10 +19,16 @@ const tableCell = 'border-b border-r border-slate-100 px-2 py-1 align-middle tex
 const supplierBadgeClass =
   'inline-flex shrink-0 items-center rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-normal uppercase tracking-wide text-emerald-800'
 const inquiryStepClass =
-  'flex min-w-[160px] flex-1 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-700'
+  'app-soft-card flex min-w-[160px] flex-1 items-center gap-2 rounded-md border px-2.5 py-2 text-xs text-[#587367]'
 const replenishmentSupplierIds = [clinicMainSupplierId, clinicBackupSupplierId]
 const replenishmentDisplayLimit = 20
 const vatRate = 0.2
+
+function ModalPortal({ children }: { children: ReactNode }) {
+  if (typeof document === 'undefined') return null
+
+  return createPortal(children, document.body)
+}
 
 function escapeHtml(value: unknown) {
   return String(value ?? '')
@@ -639,19 +646,7 @@ export function ReplenishmentPage() {
                   <th className={headerCell}>Позиция</th>
                   <th className={headerCell}>Остаток</th>
                   <th className={headerCell}>Мин.</th>
-                  <th className={headerCell}>
-                    <div className="grid justify-items-center gap-1">
-                      <span>Закупка</span>
-                      <button
-                        type="button"
-                        onClick={handleSetAllPurchasesToMinimum}
-                        className="inline-flex h-5 items-center rounded-md border border-emerald-200 bg-white px-1.5 text-[10px] font-normal normal-case tracking-normal text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-50"
-                        title="Заполнить закупку по всем строкам до минимального остатка"
-                      >
-                        все до мин.
-                      </button>
-                    </div>
-                  </th>
+                  <th className={headerCell}>Закупка</th>
                   <th className={headerCell}>Цена с НДС</th>
                   <th className={headerCell}>НДС за ед.</th>
                   <th className={headerCell}>Сумма с НДС</th>
@@ -869,7 +864,7 @@ export function ReplenishmentPage() {
         )}
         {workflowStage === 'inquiry' ? (
         <div className="shrink-0 border-t border-slate-200 bg-white">
-          <div className="grid gap-2 border-b border-slate-100 bg-slate-50/70 px-3 py-2 xl:grid-cols-[240px_minmax(0,1fr)]">
+          <div className="app-section-band grid gap-2 border-b border-slate-100 px-3 py-2 xl:grid-cols-[240px_minmax(0,1fr)]">
             <div className="min-w-0">
               <div className="text-xs font-normal uppercase tracking-wide text-slate-500">Контур запроса наличия</div>
               <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-slate-600">
@@ -912,21 +907,21 @@ export function ReplenishmentPage() {
                       type="button"
                       onClick={() => handleDownloadSupplierInquiryExcel(group)}
                       className={cn(
-                        'group inline-flex min-h-11 max-w-full items-center gap-2 rounded-md border border-sky-600 bg-[linear-gradient(135deg,#0284c7_0%,#0ea5e9_48%,#38bdf8_100%)] px-4 text-sm font-normal text-white shadow-[0_12px_28px_rgba(14,165,233,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(14,165,233,0.30)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-700/25',
+                        'group inline-flex min-h-11 max-w-full items-center gap-2 rounded-md border border-slate-700 bg-slate-700 px-4 text-sm font-normal text-white transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700/20',
                         active
-                          ? 'ring-2 ring-emerald-400/45'
+                          ? 'ring-2 ring-slate-400/45'
                           : '',
                       )}
                       title={`Скачать Excel-файл запроса наличия для ${group.supplierName}`}
                     >
-                      <span className="flex size-7 shrink-0 items-center justify-center rounded bg-white/18">
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded bg-white/15">
                         <FileSpreadsheet size={17} />
                       </span>
                       <span className="grid min-w-0 text-left leading-tight">
                         <span className="truncate">
                           {hasMultipleSuppliers ? `Скачать Excel: ${group.supplierName}` : 'Скачать Excel наличия'}
                         </span>
-                        <span className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] text-sky-50">
+                        <span className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] text-slate-100">
                           {!hasMultipleSuppliers ? <span className="truncate">{group.supplierName}</span> : null}
                           {mainSupplier ? <span className="rounded bg-white/18 px-1.5 py-0.5 text-[9px] uppercase tracking-wide">основной</span> : null}
                           <span>{group.rows.length} позиций</span>
@@ -947,16 +942,28 @@ export function ReplenishmentPage() {
               <span>Ждем ответ: <span className="text-slate-950">{waitingResponseCount}</span></span>
               <span>Готово к заказу: <span className="text-slate-950">{readyCount}</span></span>
             </div>
-            <button
-              type="button"
-              onClick={markAllAvailable}
-              disabled={!bulkAvailableLines.length}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-emerald-200 bg-white px-2.5 text-xs font-normal text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-50 disabled:pointer-events-none disabled:opacity-50"
-              title="Отметить все непроверенные строки как подтвержденные"
-            >
-              <Check size={13} />
-              Все в наличии
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSetAllPurchasesToMinimum}
+                disabled={!tableLines.length}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 text-xs font-normal text-slate-800 transition hover:border-slate-400 hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-50"
+                title="Заполнить закупку по всем строкам до минимального остатка"
+              >
+                <PackagePlus size={13} />
+                Все до минимального
+              </button>
+              <button
+                type="button"
+                onClick={markAllAvailable}
+                disabled={!bulkAvailableLines.length}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-emerald-200 bg-white px-2.5 text-xs font-normal text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-50 disabled:pointer-events-none disabled:opacity-50"
+                title="Отметить все непроверенные строки как подтвержденные"
+              >
+                <Check size={13} />
+                Все в наличии
+              </button>
+            </div>
             <button
               type="button"
               onClick={() => setWorkflowStage('order')}
@@ -988,7 +995,7 @@ export function ReplenishmentPage() {
                 type="button"
                 onClick={handleDownloadOrderExcel}
                 disabled={!readyCount}
-                className="inline-flex min-h-11 items-center gap-2 rounded-md border border-emerald-600 bg-[linear-gradient(135deg,#059669_0%,#10b981_48%,#34d399_100%)] px-4 text-sm font-normal text-white shadow-[0_12px_28px_rgba(5,150,105,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(5,150,105,0.30)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/25 disabled:pointer-events-none disabled:opacity-60"
+                className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[#267e63] bg-[#267e63] px-4 text-sm font-normal text-white transition hover:bg-[#1f6c55] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/20 disabled:pointer-events-none disabled:opacity-60"
                 title={readyCount ? 'Скачать Excel-файл заказа по подтвержденным строкам' : 'Сначала отметьте наличие по ответу поставщика'}
               >
                 <span className="flex size-7 items-center justify-center rounded bg-white/18">
@@ -996,7 +1003,7 @@ export function ReplenishmentPage() {
                 </span>
                 <span className="grid text-left leading-tight">
                   <span>Скачать Excel заказа</span>
-                  <span className="text-[11px] text-emerald-50">{readyCount} позиций</span>
+                  <span className="text-[11px] text-slate-100">{readyCount} позиций</span>
                 </span>
                 <Download size={16} />
               </button>
@@ -1039,32 +1046,36 @@ export function ReplenishmentPage() {
       ) : null}
 
       {isFormingOrder ? (
-        <BrandedLoadingModal title="Формируем заказ поставщикам" />
+        <ModalPortal>
+          <BrandedLoadingModal title="Формируем заказ поставщикам" />
+        </ModalPortal>
       ) : null}
 
       {orderReadyModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-5 text-center shadow-2xl">
-            <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
-              <Check size={22} strokeWidth={2.4} />
+        <ModalPortal>
+          <div className="app-modal-backdrop z-[60] flex items-center justify-center px-4 py-6 backdrop-blur-sm">
+            <div className="app-panel w-full max-w-sm rounded-lg border p-5 text-center shadow-2xl">
+              <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+                <Check size={22} strokeWidth={2.4} />
+              </div>
+              <div className="mt-3 text-xl font-normal text-slate-950">Готово, заказ сформирован</div>
+              <div className="mt-2 text-sm leading-5 text-slate-500">
+                Заказы по поставщикам добавлены в общий список.
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setOrderReadyModalOpen(false)
+                  navigate('/orders')
+                }}
+                className="mt-5 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-emerald-700 bg-emerald-700 px-3 text-sm font-normal text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/20"
+              >
+                Перейти к заказам
+                <ArrowRight size={15} />
+              </button>
             </div>
-            <div className="mt-3 text-xl font-normal text-slate-950">Готово, заказ сформирован</div>
-            <div className="mt-2 text-sm leading-5 text-slate-500">
-              Заказы по поставщикам добавлены в общий список.
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setOrderReadyModalOpen(false)
-                navigate('/orders')
-              }}
-              className="mt-5 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-emerald-700 bg-emerald-700 px-3 text-sm font-normal text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/20"
-            >
-              Перейти к заказам
-              <ArrowRight size={15} />
-            </button>
           </div>
-        </div>
+        </ModalPortal>
       ) : null}
     </PageTransition>
   )

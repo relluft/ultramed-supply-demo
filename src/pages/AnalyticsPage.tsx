@@ -1,5 +1,5 @@
 import { AlertTriangle, BarChart3, Boxes, Download, Gauge, PackageCheck, ReceiptText, Truck, WalletCards } from 'lucide-react'
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { PageTransition } from '../components/PageTransition'
 import { Button, Panel, StatusPill } from '../components/ui'
 import { useDemo } from '../context'
@@ -19,6 +19,79 @@ for (let index = 0; index < cp1251Chars.length; index += 1) {
   const char = cp1251Chars[index]
   if (char !== '\u0000') cp1251Reverse.set(char, index + 128)
 }
+
+const analyticsMotionCss = `
+  @keyframes analytics-rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+      filter: saturate(0.94);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+      filter: saturate(1);
+    }
+  }
+
+  @keyframes analytics-row-in {
+    from {
+      opacity: 0;
+      transform: translateY(7px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .analytics-enter {
+    animation: analytics-rise-in 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: var(--analytics-delay, 0ms);
+  }
+
+  .analytics-row-enter {
+    animation: analytics-row-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: var(--analytics-delay, 0ms);
+  }
+
+  .analytics-hover-card,
+  .analytics-hover-row {
+    transition:
+      transform 180ms ease,
+      border-color 180ms ease,
+      background-color 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .analytics-hover-card:hover {
+    transform: translateY(-2px);
+    border-color: #c9ddd6 !important;
+    box-shadow: 0 14px 34px rgba(23, 32, 51, 0.08) !important;
+  }
+
+  .analytics-hover-row:hover {
+    transform: translateY(-1px);
+    box-shadow: inset 0 0 0 1px rgba(23, 107, 87, 0.08);
+  }
+
+  .analytics-hover-row:hover .analytics-bar-fill {
+    filter: saturate(1.16);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .analytics-enter,
+    .analytics-row-enter {
+      animation: none;
+    }
+
+    .analytics-hover-card,
+    .analytics-hover-row,
+    .analytics-bar-fill {
+      transition: none;
+    }
+  }
+`
 
 function readable(value?: string | null) {
   if (!value) return ''
@@ -46,6 +119,71 @@ function barWidth(value: number, max: number, min = 3) {
   return `${Math.max(min, Math.round((value / max) * 100))}%`
 }
 
+function useAnimatedNumber(target: number, duration = 900, delay = 80) {
+  const [value, setValue] = useState(0)
+
+  useEffect(() => {
+    let frame = 0
+    let startedAt = 0
+    const timeout = window.setTimeout(() => {
+      const tick = (time: number) => {
+        if (!startedAt) startedAt = time
+        const progress = Math.min((time - startedAt) / duration, 1)
+        const eased = 1 - Math.pow(1 - progress, 3)
+
+        setValue(target * eased)
+        if (progress < 1) frame = window.requestAnimationFrame(tick)
+      }
+
+      frame = window.requestAnimationFrame(tick)
+    }, delay)
+
+    return () => {
+      window.clearTimeout(timeout)
+      window.cancelAnimationFrame(frame)
+    }
+  }, [delay, duration, target])
+
+  return value
+}
+
+function parseAnimatedValue(value: string | number) {
+  if (typeof value === 'number') return { target: value, prefix: '', suffix: '', decimals: 0 }
+
+  const match = value.match(/^([\d\s.,]+)(.*)$/)
+  if (!match) return null
+
+  const numeric = Number(match[1].replace(/\s/g, '').replace(',', '.'))
+  if (!Number.isFinite(numeric)) return null
+
+  const decimals = match[1].includes(',') || match[1].includes('.') ? 1 : 0
+  return { target: numeric, prefix: '', suffix: match[2], decimals }
+}
+
+function AnimatedValue({
+  value,
+  className,
+  duration = 900,
+  delay = 80,
+}: {
+  value: string | number
+  className?: string
+  duration?: number
+  delay?: number
+}) {
+  const parsed = parseAnimatedValue(value)
+  const animated = useAnimatedNumber(parsed?.target ?? 0, duration, delay)
+
+  if (!parsed) return <span className={className}>{value}</span>
+
+  const formatted = new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: parsed.decimals,
+    maximumFractionDigits: parsed.decimals,
+  }).format(animated)
+
+  return <span className={className}>{`${parsed.prefix}${formatted}${parsed.suffix}`}</span>
+}
+
 function moneyFromOrder(order: ReturnType<typeof useDemo>['state']['orders'][number]) {
   return order.lines.reduce((sum, line) => sum + (line.price ?? 0) * line.quantity, 0)
 }
@@ -65,21 +203,26 @@ function Section({
   action,
   children,
   className,
+  delay = 0,
 }: {
   icon: ReactNode
   title: string
   action?: ReactNode
   children: ReactNode
   className?: string
+  delay?: number
 }) {
   return (
-    <Panel className={cn('overflow-hidden p-0', className)}>
-      <div className="flex min-h-12 items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+    <Panel
+      className={cn('analytics-enter analytics-hover-card overflow-hidden border-[#dfe6e3] bg-white p-0', className)}
+      style={{ '--analytics-delay': `${delay}ms` } as CSSProperties}
+    >
+      <div className="flex min-h-14 items-center justify-between gap-3 border-b border-[#e4ebe8] px-5 py-3.5">
         <div className="flex min-w-0 items-center gap-2">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-600">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-[#e8f3ef] text-[#176b57]">
             {icon}
           </div>
-          <div className="truncate text-base font-medium text-slate-950">{title}</div>
+          <div className="truncate text-[15px] font-medium text-[#172033]">{title}</div>
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}
       </div>
@@ -94,30 +237,42 @@ function ExecutiveMetric({
   value,
   caption,
   accent = 'neutral',
+  featured = false,
 }: {
   icon: ReactNode
   label: string
   value: string | number
   caption?: string
   accent?: 'neutral' | 'success' | 'warning' | 'danger' | 'info'
+  featured?: boolean
 }) {
   const colors = {
-    neutral: 'border-slate-200 bg-white text-slate-600',
-    success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    warning: 'border-amber-200 bg-amber-50 text-amber-700',
-    danger: 'border-rose-200 bg-rose-50 text-rose-700',
-    info: 'border-sky-200 bg-sky-50 text-sky-700',
+    neutral: 'bg-[#edf2f0] text-[#425466]',
+    success: 'bg-[#e8f3ef] text-[#176b57]',
+    warning: 'bg-[#fff7e6] text-[#a66200]',
+    danger: 'bg-[#fff1f0] text-[#b42318]',
+    info: 'bg-[#edf7fb] text-[#256f9c]',
   }[accent]
 
   return (
-    <div className="grid min-h-[112px] grid-rows-[auto_1fr] rounded-md border border-slate-200 bg-white p-3">
+    <div
+      className={cn(
+        'analytics-hover-card grid min-h-[118px] grid-rows-[auto_1fr] rounded-lg border border-[#dfe6e3] bg-white p-4',
+        featured && 'min-h-[154px] border-[#c9ddd6] bg-[#f5faf8] p-5 sm:col-span-2 xl:col-span-2',
+      )}
+    >
       <div className="flex items-center justify-between gap-3">
-        <div className="truncate text-[11px] uppercase tracking-wide text-slate-500">{label}</div>
-        <div className={cn('grid size-8 shrink-0 place-items-center rounded-md border', colors)}>{icon}</div>
+        <div className="truncate text-[11px] font-medium uppercase tracking-wide text-[#66746f]">{label}</div>
+        <div className={cn('grid size-8 shrink-0 place-items-center rounded-md', featured && 'size-9', colors)}>{icon}</div>
       </div>
       <div className="mt-3 flex min-h-0 flex-col justify-end">
-        <div className="truncate text-2xl font-medium leading-none text-slate-950 tabular-nums">{value}</div>
-        {caption ? <div className="mt-1 truncate text-xs text-slate-500">{caption}</div> : null}
+        <AnimatedValue
+          value={value}
+          className={cn('truncate font-medium leading-none text-[#172033] tabular-nums', featured ? 'text-5xl' : 'text-[26px]')}
+          duration={featured ? 1100 : 900}
+          delay={featured ? 120 : 180}
+        />
+        {caption ? <div className={cn('mt-2 truncate text-xs text-[#6b7773]', featured && 'text-sm')}>{caption}</div> : null}
       </div>
     </div>
   )
@@ -133,27 +288,42 @@ function Metric({
   accent?: 'neutral' | 'success' | 'warning' | 'danger' | 'info'
 }) {
   const colors = {
-    neutral: 'text-slate-950',
-    success: 'text-emerald-700',
-    warning: 'text-amber-700',
-    danger: 'text-rose-700',
-    info: 'text-sky-700',
+    neutral: 'text-[#172033]',
+    success: 'text-[#176b57]',
+    warning: 'text-[#a66200]',
+    danger: 'text-[#b42318]',
+    info: 'text-[#256f9c]',
   }[accent]
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
-      <div className="truncate text-[11px] uppercase tracking-wide text-slate-500">{label}</div>
-      <div className={cn('mt-1 truncate text-xl font-medium leading-none', colors)}>{value}</div>
+    <div className="rounded-md px-3 py-2">
+      <div className="truncate text-[11px] font-medium uppercase tracking-wide text-[#66746f]">{label}</div>
+      <AnimatedValue value={value} className={cn('mt-1 block truncate text-[21px] font-medium leading-none tabular-nums', colors)} duration={820} delay={220} />
     </div>
   )
 }
 
 function MiniBar({ value, max, className }: { value: number; max: number; className: string }) {
+  const [filled, setFilled] = useState(false)
+
+  useEffect(() => {
+    setFilled(false)
+    const frame = window.requestAnimationFrame(() => setFilled(true))
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [max, value])
+
   return (
-    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-      <div className={cn('h-full rounded-full', className)} style={{ width: barWidth(value, max) }} />
+    <div className="h-2 overflow-hidden rounded-full bg-[#edf2f0]">
+      <div className={cn('analytics-bar-fill h-full rounded-full transition-[width,filter] duration-1000 ease-out', className)} style={{ width: filled ? barWidth(value, max) : '0%' }} />
     </div>
   )
+}
+
+function StackedSegment({ width, className, delay = 220 }: { width: number; className: string; delay?: number }) {
+  const animatedWidth = useAnimatedNumber(width, 900, delay)
+
+  return <div className={className} style={{ width: `${animatedWidth}%` }} />
 }
 
 function RingMetric({
@@ -168,24 +338,25 @@ function RingMetric({
   tone: 'emerald' | 'amber' | 'rose' | 'sky'
 }) {
   const share = percent(value, total)
+  const animatedShare = useAnimatedNumber(share, 900, 260)
   const color = {
-    emerald: '#059669',
-    amber: '#d97706',
-    rose: '#e11d48',
-    sky: '#0284c7',
+    emerald: '#176b57',
+    amber: '#b76e00',
+    rose: '#b42318',
+    sky: '#256f9c',
   }[tone]
 
   return (
-    <div className="flex items-center gap-3 rounded-md border border-slate-200 bg-white p-3">
+    <div className="flex items-center gap-3 rounded-md bg-transparent p-2.5">
       <div
         className="grid size-14 shrink-0 place-items-center rounded-full"
-        style={{ background: `conic-gradient(${color} ${share * 3.6}deg, #e2e8f0 0deg)` }}
+        style={{ background: `conic-gradient(${color} ${animatedShare * 3.6}deg, #e3ebe8 0deg)` }}
       >
-        <div className="grid size-10 place-items-center rounded-full bg-white text-xs font-medium text-slate-950">{share}%</div>
+        <div className="grid size-10 place-items-center rounded-full bg-white text-xs font-medium text-[#172033] tabular-nums">{Math.round(animatedShare)}%</div>
       </div>
       <div className="min-w-0">
-        <div className="truncate text-sm font-medium text-slate-950">{label}</div>
-        <div className="mt-0.5 text-xs text-slate-500">{formatNumber(value)} из {formatNumber(total)}</div>
+        <div className="truncate text-sm font-medium text-[#172033]">{label}</div>
+        <div className="mt-0.5 text-xs text-[#6b7773]">{formatNumber(value)} из {formatNumber(total)}</div>
       </div>
     </div>
   )
@@ -364,21 +535,21 @@ export function AnalyticsPage() {
   }, [metrics.activeReplenishment])
 
   const processRows = [
-    { label: 'Заявки', value: requests.length, secondary: `${metrics.requestLines.length} строк`, tone: 'bg-sky-500' },
-    { label: 'Пополнение', value: metrics.activeReplenishment.length, secondary: `${metrics.deficitUnits} ед.`, tone: 'bg-amber-500' },
-    { label: 'Заказы', value: orders.length, secondary: money(metrics.orderedTotal), tone: 'bg-emerald-600' },
-    { label: 'Ожидание прихода', value: metrics.waitingReceiptOrders.length, secondary: money(metrics.waitingReceiptTotal), tone: 'bg-indigo-500' },
-    { label: 'Приход принят', value: metrics.acceptedOrders.length, secondary: `${metrics.orderLines.length} строк`, tone: 'bg-teal-600' },
+    { label: 'Заявки', value: requests.length, secondary: `${metrics.requestLines.length} строк`, tone: 'bg-[#256f9c]' },
+    { label: 'Пополнение', value: metrics.activeReplenishment.length, secondary: `${metrics.deficitUnits} ед.`, tone: 'bg-[#b76e00]' },
+    { label: 'Заказы', value: orders.length, secondary: money(metrics.orderedTotal), tone: 'bg-[#176b57]' },
+    { label: 'Ожидание прихода', value: metrics.waitingReceiptOrders.length, secondary: money(metrics.waitingReceiptTotal), tone: 'bg-[#4f6f9f]' },
+    { label: 'Приход принят', value: metrics.acceptedOrders.length, secondary: `${metrics.orderLines.length} строк`, tone: 'bg-[#2f7d73]' },
   ]
   const maxProcessValue = Math.max(...processRows.map((row) => row.value), 1)
   const bottleneck = [...processRows].sort((left, right) => right.value - left.value)[0]
 
   const financialRows = [
-    { label: 'Стоимость склада', value: money(metrics.stockValue), share: 100, tone: 'bg-slate-500' },
-    { label: 'Заказано поставщикам', value: money(metrics.orderedTotal), share: percent(metrics.orderedTotal, Math.max(metrics.stockValue, metrics.orderedTotal, 1)), tone: 'bg-emerald-600' },
-    { label: 'Сумма в ожидании прихода', value: money(metrics.waitingReceiptTotal), share: percent(metrics.waitingReceiptTotal, Math.max(metrics.orderedTotal, 1)), tone: 'bg-indigo-500' },
-    { label: 'Дефицит к минимуму', value: money(metrics.deficitValue), share: percent(metrics.deficitValue, Math.max(metrics.stockValue, 1)), tone: 'bg-rose-500' },
-    { label: 'Добор до желаемого уровня', value: money(metrics.desiredShortageValue), share: percent(metrics.desiredShortageValue, Math.max(metrics.stockValue + metrics.desiredShortageValue, 1)), tone: 'bg-amber-500' },
+    { label: 'Стоимость склада', value: money(metrics.stockValue), share: 100, tone: 'bg-[#66746f]' },
+    { label: 'Заказано поставщикам', value: money(metrics.orderedTotal), share: percent(metrics.orderedTotal, Math.max(metrics.stockValue, metrics.orderedTotal, 1)), tone: 'bg-[#176b57]' },
+    { label: 'Сумма в ожидании прихода', value: money(metrics.waitingReceiptTotal), share: percent(metrics.waitingReceiptTotal, Math.max(metrics.orderedTotal, 1)), tone: 'bg-[#4f6f9f]' },
+    { label: 'Дефицит к минимуму', value: money(metrics.deficitValue), share: percent(metrics.deficitValue, Math.max(metrics.stockValue, 1)), tone: 'bg-[#b42318]' },
+    { label: 'Добор до желаемого уровня', value: money(metrics.desiredShortageValue), share: percent(metrics.desiredShortageValue, Math.max(metrics.stockValue + metrics.desiredShortageValue, 1)), tone: 'bg-[#b76e00]' },
   ]
 
   const supplierConcentration = percent(topSupplier?.total ?? 0, Math.max(metrics.orderedTotal, 1))
@@ -481,30 +652,32 @@ export function AnalyticsPage() {
 
   return (
     <PageTransition className="min-h-full">
-      <div className="grid gap-4 pb-4">
-        <Panel className="overflow-hidden p-0">
-          <div className="flex min-h-14 flex-col gap-3 border-b border-slate-200 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+      <style>{analyticsMotionCss}</style>
+      <div className="grid gap-5 pb-5">
+        <Panel className="analytics-enter analytics-hover-card overflow-hidden border-[#dfe6e3] bg-white p-0" style={{ '--analytics-delay': '0ms' } as CSSProperties}>
+          <div className="flex min-h-16 flex-col gap-3 border-b border-[#e4ebe8] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-xl font-medium text-slate-950">Аналитика склада клиники</h1>
-              <div className="mt-0.5 text-xs uppercase tracking-wide text-slate-500">Финансы · поставщики · процесс · складская политика</div>
+              <h1 className="text-[22px] font-medium leading-tight text-[#172033]">Аналитика склада клиники</h1>
+              <div className="mt-1 text-xs font-medium uppercase tracking-wide text-[#66746f]">Финансы · поставщики · процесс · складская политика</div>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               <StatusPill tone={metrics.stockHealth >= 85 ? 'success' : metrics.stockHealth >= 70 ? 'warning' : 'danger'}>
                 Индекс склада {metrics.stockHealth}%
               </StatusPill>
-              <Button variant="secondary" className="min-h-8 px-2.5 py-1.5 text-xs" onClick={handleExportReport}>
+              <Button variant="secondary" className="min-h-8 border-[#d1ddd8] px-2.5 py-1.5 text-xs text-[#172033]" onClick={handleExportReport}>
                 <Download size={15} />
                 Экспорт отчета
               </Button>
             </div>
           </div>
-          <div className="grid gap-2 bg-slate-50/75 p-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 bg-[#f6f8f7] p-4 sm:grid-cols-2 xl:grid-cols-6">
             <ExecutiveMetric
               icon={<Gauge size={17} />}
               label="Индекс склада"
               value={`${metrics.stockHealth}%`}
               caption={`${formatNumber(metrics.activeCatalog.length - metrics.belowMinimumItems.length)} из ${formatNumber(metrics.activeCatalog.length)} позиций в норме`}
               accent={metrics.stockHealth >= 85 ? 'success' : metrics.stockHealth >= 70 ? 'warning' : 'danger'}
+              featured
             />
             <ExecutiveMetric
               icon={<WalletCards size={17} />}
@@ -536,79 +709,130 @@ export function AnalyticsPage() {
           </div>
         </Panel>
 
-        <Section icon={<WalletCards size={18} />} title="Финансовая оценка запасов">
-          <div className="grid gap-2 bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.75fr)]">
+          <Section icon={<WalletCards size={18} />} title="Финансовая оценка запасов" delay={120}>
+          <div className="grid gap-1 border-b border-[#e4ebe8] bg-[#f6f8f7] p-3 sm:grid-cols-2 lg:grid-cols-5">
             <Metric label="Стоимость склада" value={money(metrics.stockValue)} />
             <Metric label="Заказано поставщикам" value={money(metrics.orderedTotal)} />
             <Metric label="Сумма в ожидании" value={money(metrics.waitingReceiptTotal)} />
             <Metric label="Дефицит к минимуму" value={money(metrics.deficitValue)} accent={metrics.deficitValue ? 'danger' : 'success'} />
             <Metric label="Добор до желаемого" value={money(metrics.desiredShortageValue)} accent={metrics.desiredShortageValue ? 'warning' : 'success'} />
           </div>
-          <div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="grid gap-3">
-              {financialRows.map((row) => (
-                <div key={row.label}>
+          <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+            <div className="grid gap-4">
+              {financialRows.map((row, index) => (
+                <div
+                  key={row.label}
+                  className="analytics-row-enter analytics-hover-row rounded-md px-2 py-1.5"
+                  style={{ '--analytics-delay': `${220 + index * 45}ms` } as CSSProperties}
+                >
                   <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-                    <span className="truncate text-slate-700">{row.label}</span>
-                    <span className="shrink-0 font-medium text-slate-950">{row.value}</span>
+                    <span className="truncate text-[#425466]">{row.label}</span>
+                    <AnimatedValue value={row.value} className="shrink-0 font-medium text-[#172033] tabular-nums" duration={880} delay={240} />
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-2.5 overflow-hidden rounded-full bg-[#edf2f0]">
                     <div className={cn('h-full rounded-full', row.tone)} style={{ width: `${Math.max(3, row.share)}%` }} />
                   </div>
                 </div>
               ))}
             </div>
-            <div className="grid gap-2">
+            <div className="grid content-start gap-1 rounded-lg bg-[#f6f8f7] p-2">
               <Metric label="Доля дефицита от склада" value={`${percent(metrics.deficitValue, Math.max(metrics.stockValue, 1))}%`} accent={metrics.deficitValue ? 'warning' : 'success'} />
               <Metric label="Ед. к минимуму" value={formatNumber(metrics.deficitUnits)} />
               <Metric label="Ед. до желаемого" value={formatNumber(metrics.desiredShortageUnits)} />
             </div>
           </div>
-        </Section>
+          </Section>
 
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_420px]">
-          <Section icon={<Gauge size={18} />} title="Качество складской политики">
+          <Section
+            icon={<PackageCheck size={18} />}
+            title="Дефицитные позиции"
+            delay={180}
+            action={
+              <StatusPill tone={problemItems.length ? 'danger' : 'success'}>
+                <AnimatedValue value={problemItems.length} duration={650} delay={160} />
+              </StatusPill>
+            }
+          >
+            <div className="grid gap-3 p-4">
+              {problemItems.length ? (
+                problemItems.map((row, index) => (
+                  <div
+                    key={row.item.id}
+                    className="analytics-row-enter analytics-hover-row rounded-md border-l-2 border-[#b42318]/50 bg-white px-3 py-2.5"
+                    style={{ '--analytics-delay': `${260 + index * 38}ms` } as CSSProperties}
+                  >
+                    <div className="mb-2 flex items-start justify-between gap-3 text-sm">
+                      <div className="min-w-0">
+                        <div className="truncate font-medium text-[#172033]">{readable(row.item.shortName || row.item.fullName)}</div>
+                        <div className="text-xs text-[#6b7773]">{readable(row.supplier?.name) || '-'}</div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <AnimatedValue value={formatNumber(row.deficit)} className="block font-medium text-[#b42318]" duration={760} delay={260} />
+                        <AnimatedValue value={money(row.deficitValue)} className="block text-xs text-[#6b7773]" duration={820} delay={280} />
+                      </div>
+                    </div>
+                    <MiniBar value={row.deficitValue || row.deficit} max={Math.max(...problemItems.map((item) => item.deficitValue || item.deficit), 1)} className="bg-[#b42318]" />
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-md border border-[#dfe6e3] bg-white px-3 py-4 text-sm text-[#6b7773]">Критичных позиций нет</div>
+              )}
+            </div>
+          </Section>
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <Section icon={<Gauge size={18} />} title="Качество складской политики" delay={260}>
             <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
               <RingMetric label="С запасом" value={metrics.enoughItems.length} total={metrics.activeCatalog.length} tone="emerald" />
               <RingMetric label="Близко к минимуму" value={metrics.nearMinimumItems.length} total={metrics.activeCatalog.length} tone="amber" />
               <RingMetric label="Ниже минимума" value={metrics.belowMinimumItems.length} total={metrics.activeCatalog.length} tone="rose" />
               <RingMetric label="Нет остатка" value={metrics.outOfStockItems.length} total={metrics.activeCatalog.length} tone="sky" />
             </div>
-            <div className="border-t border-slate-200 px-4 py-3">
-              <div className="flex h-3 overflow-hidden rounded-full bg-slate-100">
-                <div className="bg-emerald-600" style={{ width: `${percent(metrics.enoughItems.length, metrics.activeCatalog.length)}%` }} />
-                <div className="bg-amber-500" style={{ width: `${percent(metrics.nearMinimumItems.length, metrics.activeCatalog.length)}%` }} />
-                <div className="bg-rose-500" style={{ width: `${percent(Math.max(metrics.belowMinimumItems.length - metrics.outOfStockItems.length, 0), metrics.activeCatalog.length)}%` }} />
-                <div className="bg-slate-800" style={{ width: `${percent(metrics.outOfStockItems.length, metrics.activeCatalog.length)}%` }} />
+            <div className="border-t border-[#e4ebe8] px-5 py-4">
+              <div className="flex h-3 overflow-hidden rounded-full bg-[#edf2f0]">
+                <StackedSegment className="bg-[#176b57]" width={percent(metrics.enoughItems.length, metrics.activeCatalog.length)} delay={260} />
+                <StackedSegment className="bg-[#b76e00]" width={percent(metrics.nearMinimumItems.length, metrics.activeCatalog.length)} delay={320} />
+                <StackedSegment className="bg-[#b42318]" width={percent(Math.max(metrics.belowMinimumItems.length - metrics.outOfStockItems.length, 0), metrics.activeCatalog.length)} delay={380} />
+                <StackedSegment className="bg-[#172033]" width={percent(metrics.outOfStockItems.length, metrics.activeCatalog.length)} delay={440} />
               </div>
             </div>
-            <div className="overflow-x-auto border-t border-slate-200">
+            <div className="overflow-x-auto border-t border-[#e4ebe8]">
               <table className="w-full min-w-[760px] border-separate border-spacing-0">
                 <thead>
                   <tr>
                     {['Категория', 'Позиций', 'Ниже мин.', 'Нет остатка', 'Оценка дефицита', 'Риск'].map((heading) => (
-                      <th key={heading} className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                      <th key={heading} className="border-b border-[#e4ebe8] bg-white px-4 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-[#66746f]">
                         {heading}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {categoryStats.map((item) => (
+                  {categoryStats.map((item, index) => (
                     <tr
                       key={item.category}
                       className={cn(
-                        'transition hover:bg-slate-100/70',
-                        item.out ? 'bg-rose-50/70' : item.below ? 'bg-amber-50/60' : 'bg-white',
+                        'analytics-row-enter analytics-hover-row bg-white transition hover:bg-[#f6f8f7]',
                       )}
+                      style={{ '--analytics-delay': `${300 + index * 34}ms` } as CSSProperties}
                     >
-                      <td className="border-b border-slate-100 px-3 py-2 text-sm font-medium text-slate-950">{item.category}</td>
-                      <td className="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{formatNumber(item.total)}</td>
-                      <td className="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{formatNumber(item.below)}</td>
-                      <td className="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{formatNumber(item.out)}</td>
-                      <td className="border-b border-slate-100 px-3 py-2 text-sm font-medium text-slate-950">{money(item.deficitValue)}</td>
-                      <td className="border-b border-slate-100 px-3 py-2">
-                        <MiniBar value={item.below} max={maxCategoryBelow} className={item.below ? 'bg-amber-500' : 'bg-emerald-500'} />
+                      <td className={cn('border-b border-[#edf2f0] px-4 py-3 text-sm font-medium text-[#172033]', item.out ? 'border-l-[#b42318]' : item.below ? 'border-l-[#b76e00]' : 'border-l-[#176b57]')}>{item.category}</td>
+                      <td className="border-b border-[#edf2f0] px-4 py-3 text-right text-sm text-[#425466] tabular-nums">
+                        <AnimatedValue value={formatNumber(item.total)} duration={680} delay={300} />
+                      </td>
+                      <td className="border-b border-[#edf2f0] px-4 py-3 text-right text-sm text-[#425466] tabular-nums">
+                        <AnimatedValue value={formatNumber(item.below)} duration={680} delay={320} />
+                      </td>
+                      <td className="border-b border-[#edf2f0] px-4 py-3 text-right text-sm text-[#425466] tabular-nums">
+                        <AnimatedValue value={formatNumber(item.out)} duration={680} delay={340} />
+                      </td>
+                      <td className="border-b border-[#edf2f0] px-4 py-3 text-right text-sm font-medium text-[#172033] tabular-nums">
+                        <AnimatedValue value={money(item.deficitValue)} duration={780} delay={360} />
+                      </td>
+                      <td className="border-b border-[#edf2f0] px-4 py-3">
+                        <MiniBar value={item.below} max={maxCategoryBelow} className={item.below ? 'bg-[#b76e00]' : 'bg-[#176b57]'} />
                       </td>
                     </tr>
                   ))}
@@ -617,71 +841,29 @@ export function AnalyticsPage() {
             </div>
           </Section>
 
-          <Section icon={<PackageCheck size={18} />} title="Дефицитные позиции" action={<StatusPill tone={problemItems.length ? 'danger' : 'success'}>{problemItems.length}</StatusPill>}>
-            <div className="grid gap-3 p-4">
-              {problemItems.length ? (
-                problemItems.map((row) => (
-                  <div key={row.item.id}>
-                    <div className="mb-2 flex items-start justify-between gap-3 text-sm">
-                      <div className="min-w-0">
-                        <div className="truncate font-medium text-slate-950">{readable(row.item.shortName || row.item.fullName)}</div>
-                        <div className="text-xs text-slate-500">{readable(row.supplier?.name) || '-'}</div>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <div className="font-medium text-rose-700">{formatNumber(row.deficit)}</div>
-                        <div className="text-xs text-slate-500">{money(row.deficitValue)}</div>
-                      </div>
-                    </div>
-                    <MiniBar value={row.deficitValue || row.deficit} max={Math.max(...problemItems.map((item) => item.deficitValue || item.deficit), 1)} className="bg-rose-500" />
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">Критичных позиций нет</div>
-              )}
-            </div>
-          </Section>
-        </div>
-
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_420px]">
-          <Section icon={<BarChart3 size={18} />} title="Контроль процесса">
-            <div className="grid gap-4 p-4">
-              {processRows.map((row) => (
-                <div key={row.label} className="grid grid-cols-[132px_minmax(0,1fr)_88px] items-center gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-slate-800">{row.label}</div>
-                    <div className="mt-0.5 text-xs text-slate-500">{row.secondary}</div>
-                  </div>
-                  <MiniBar value={row.value} max={maxProcessValue} className={row.tone} />
-                  <div className="text-right text-lg font-medium text-slate-950">{formatNumber(row.value)}</div>
-                </div>
-              ))}
-            </div>
-            <div className="grid gap-2 border-t border-slate-200 bg-slate-50 p-3 sm:grid-cols-3">
-              <Metric label="Максимальный участок" value={bottleneck.label} />
-              <Metric label="Открыто пополнение" value={formatNumber(metrics.activeReplenishment.length)} accent={metrics.activeReplenishment.length ? 'warning' : 'success'} />
-              <Metric label="Заказов в ожидании" value={formatNumber(metrics.waitingReceiptOrders.length)} accent={metrics.waitingReceiptOrders.length ? 'info' : 'success'} />
-            </div>
-          </Section>
-
-          <Section icon={<ReceiptText size={18} />} title="Статусы процесса">
+          <Section icon={<ReceiptText size={18} />} title="Статусы процесса" delay={320}>
             <div className="grid gap-3 p-4">
               {[
                 { title: 'Заявки', rows: requestStatusStats },
                 { title: 'Заказы', rows: orderStatusStats },
                 { title: 'Пополнение', rows: replenishmentStatusStats },
               ].map((group, index) => (
-                <div key={group.title} className={cn(index > 0 && 'border-t border-slate-200 pt-3')}>
-                  <div className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">{group.title}</div>
+                <div key={group.title} className={cn(index > 0 && 'border-t border-[#e4ebe8] pt-3')}>
+                  <div className="mb-2 text-xs font-medium uppercase tracking-wide text-[#66746f]">{group.title}</div>
                   <div className="grid gap-2">
                     {group.rows.length ? (
-                      group.rows.map((item) => (
-                        <div key={`${group.title}-${item.status}`} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                      group.rows.map((item, rowIndex) => (
+                        <div
+                          key={`${group.title}-${item.status}`}
+                          className="analytics-row-enter analytics-hover-row flex items-center justify-between gap-3 rounded-md border border-[#dfe6e3] bg-white px-3 py-2.5"
+                          style={{ '--analytics-delay': `${340 + index * 80 + rowIndex * 34}ms` } as CSSProperties}
+                        >
                           <StatusPill tone={statusTone(item.status)}>{item.label}</StatusPill>
-                          <span className="text-base font-medium text-slate-950">{formatNumber(item.count)}</span>
+                          <AnimatedValue value={formatNumber(item.count)} className="text-base font-medium text-[#172033] tabular-nums" duration={700} delay={260} />
                         </div>
                       ))
                     ) : (
-                      <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">Нет данных</div>
+                      <div className="rounded-md border border-[#dfe6e3] bg-white px-3 py-3 text-sm text-[#6b7773]">Нет данных</div>
                     )}
                   </div>
                 </div>
@@ -690,12 +872,39 @@ export function AnalyticsPage() {
           </Section>
         </div>
 
+        <div className="grid gap-5">
+          <Section icon={<BarChart3 size={18} />} title="Контроль процесса" delay={400}>
+            <div className="grid gap-4 p-5">
+              {processRows.map((row, index) => (
+                <div
+                  key={row.label}
+                  className="analytics-row-enter analytics-hover-row grid grid-cols-[150px_minmax(0,1fr)_88px] items-center gap-4 rounded-md px-2 py-1.5"
+                  style={{ '--analytics-delay': `${420 + index * 42}ms` } as CSSProperties}
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-[#172033]">{row.label}</div>
+                    <div className="mt-0.5 text-xs text-[#6b7773]">{row.secondary}</div>
+                  </div>
+                  <MiniBar value={row.value} max={maxProcessValue} className={row.tone} />
+                  <AnimatedValue value={formatNumber(row.value)} className="text-right text-lg font-medium text-[#172033] tabular-nums" duration={760} delay={260} />
+                </div>
+              ))}
+            </div>
+            <div className="grid gap-1 border-t border-[#e4ebe8] bg-[#f6f8f7] p-3 sm:grid-cols-3">
+              <Metric label="Максимальный участок" value={bottleneck.label} />
+              <Metric label="Открыто пополнение" value={formatNumber(metrics.activeReplenishment.length)} accent={metrics.activeReplenishment.length ? 'warning' : 'success'} />
+              <Metric label="Заказов в ожидании" value={formatNumber(metrics.waitingReceiptOrders.length)} accent={metrics.waitingReceiptOrders.length ? 'info' : 'success'} />
+            </div>
+          </Section>
+        </div>
+
         <Section
           icon={<Truck size={18} />}
           title="Зависимость от поставщиков"
+          delay={480}
           action={<StatusPill tone={supplierConcentration >= 70 ? 'warning' : 'neutral'}>Топ-1: {supplierConcentration}% заказов</StatusPill>}
         >
-          <div className="grid gap-2 bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-1 border-b border-[#e4ebe8] bg-[#f6f8f7] p-3 sm:grid-cols-2 lg:grid-cols-4">
             <Metric label="Поставщиков в заказах" value={formatNumber(supplierStats.filter((item) => item.orders > 0).length)} />
             <Metric label="Топ поставщик" value={readable(topSupplier?.supplier.name) || '-'} />
             <Metric label="Без альтернатив" value={formatNumber(supplierSingleChannelItems)} accent={supplierSingleChannelItems ? 'warning' : 'success'} />
@@ -706,40 +915,46 @@ export function AnalyticsPage() {
               <thead>
                 <tr>
                   {['Поставщик', 'Сумма заказов', 'Доля заказов', 'Позиций каталога', 'Без альтернатив', 'Ожидание прихода'].map((heading) => (
-                    <th key={heading} className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                    <th key={heading} className="border-b border-[#e4ebe8] bg-white px-4 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-[#66746f]">
                       {heading}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {supplierStats.map((item) => (
+                {supplierStats.map((item, index) => (
                   <tr
                     key={item.supplier.id}
                     className={cn(
-                      'transition hover:bg-slate-100/70',
-                      item.noAlternatives ? 'bg-amber-50/55' : item.waiting ? 'bg-sky-50/55' : 'bg-white',
+                      'analytics-row-enter analytics-hover-row bg-white transition hover:bg-[#f6f8f7]',
                     )}
+                    style={{ '--analytics-delay': `${520 + index * 32}ms` } as CSSProperties}
                   >
-                    <td className="border-b border-slate-100 px-3 py-2">
-                      <div className="text-sm font-medium text-slate-950">{readable(item.supplier.name)}</div>
-                      <div className="text-xs text-slate-500">{readable(item.supplier.role)}</div>
+                    <td className={cn('border-b border-[#edf2f0] px-4 py-3', item.noAlternatives ? 'border-l-[#b76e00]' : item.waiting ? 'border-l-[#256f9c]' : 'border-l-[#176b57]')}>
+                      <div className="text-sm font-medium text-[#172033]">{readable(item.supplier.name)}</div>
+                      <div className="text-xs text-[#6b7773]">{readable(item.supplier.role)}</div>
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2 text-sm font-medium text-slate-950">{money(item.total)}</td>
-                    <td className="border-b border-slate-100 px-3 py-2">
+                    <td className="border-b border-[#edf2f0] px-4 py-3 text-right text-sm font-medium text-[#172033] tabular-nums">
+                      <AnimatedValue value={money(item.total)} duration={820} delay={300} />
+                    </td>
+                    <td className="border-b border-[#edf2f0] px-4 py-3">
                       <div className="grid grid-cols-[minmax(0,1fr)_42px] items-center gap-2">
-                        <MiniBar value={item.total} max={maxSupplierTotal} className="bg-emerald-600" />
-                        <span className="text-right text-xs text-slate-500">{percent(item.total, Math.max(metrics.orderedTotal, 1))}%</span>
+                        <MiniBar value={item.total} max={maxSupplierTotal} className="bg-[#176b57]" />
+                        <AnimatedValue value={`${percent(item.total, Math.max(metrics.orderedTotal, 1))}%`} className="text-right text-xs text-[#6b7773] tabular-nums" duration={700} delay={340} />
                       </div>
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2">
+                    <td className="border-b border-[#edf2f0] px-4 py-3">
                       <div className="grid grid-cols-[minmax(0,1fr)_42px] items-center gap-2">
-                        <MiniBar value={item.primaryCatalog} max={maxSupplierCatalog} className="bg-sky-500" />
-                        <span className="text-right text-xs text-slate-500">{formatNumber(item.primaryCatalog)}</span>
+                        <MiniBar value={item.primaryCatalog} max={maxSupplierCatalog} className="bg-[#256f9c]" />
+                        <AnimatedValue value={formatNumber(item.primaryCatalog)} className="text-right text-xs text-[#6b7773] tabular-nums" duration={700} delay={360} />
                       </div>
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{formatNumber(item.noAlternatives)}</td>
-                    <td className="border-b border-slate-100 px-3 py-2 text-sm text-slate-700">{formatNumber(item.waiting)}</td>
+                    <td className="border-b border-[#edf2f0] px-4 py-3 text-right text-sm text-[#425466] tabular-nums">
+                      <AnimatedValue value={formatNumber(item.noAlternatives)} duration={680} delay={380} />
+                    </td>
+                    <td className="border-b border-[#edf2f0] px-4 py-3 text-right text-sm text-[#425466] tabular-nums">
+                      <AnimatedValue value={formatNumber(item.waiting)} duration={680} delay={400} />
+                    </td>
                   </tr>
                 ))}
               </tbody>

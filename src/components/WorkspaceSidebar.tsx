@@ -111,7 +111,7 @@ export function WorkspaceSidebar() {
   return (
     <aside
       className={cn(
-        'rounded-lg border border-slate-200/80 bg-white p-2 shadow-[0_1px_2px_rgba(15,23,42,0.035)] lg:sticky lg:top-3 lg:shrink-0',
+        'app-sidebar rounded-lg border p-2 lg:sticky lg:top-3 lg:shrink-0',
         isNurse ? 'lg:h-auto lg:w-[186px] lg:self-start' : 'lg:h-[calc(100vh-1.5rem)] lg:w-[218px]',
       )}
     >
@@ -132,7 +132,7 @@ export function WorkspaceSidebar() {
 
           return (
             <section key={group.title}>
-              <div className="mb-1.5 flex items-center gap-2 px-2 text-[11px] font-normal uppercase tracking-wide text-slate-400">
+              <div className="mb-1.5 flex items-center gap-2 px-2 text-[11px] font-normal uppercase tracking-wide text-slate-500">
                 <GroupIcon size={13} />
                 {group.title}
               </div>
@@ -146,8 +146,8 @@ export function WorkspaceSidebar() {
                     item.disabled
                       ? 'cursor-not-allowed text-slate-400 opacity-55'
                       : active
-                        ? 'bg-emerald-50 pr-6 text-emerald-900 ring-1 ring-inset ring-emerald-600/25'
-                        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950',
+                        ? 'bg-slate-100 pr-6 text-slate-950 ring-1 ring-inset ring-slate-300'
+                        : 'text-slate-700 hover:bg-slate-50 hover:text-slate-950',
                   )
                   const content = (
                     <>
@@ -160,7 +160,7 @@ export function WorkspaceSidebar() {
                       <Icon size={15} className="shrink-0" />
                       <span className="min-w-0">{item.label}</span>
                       {active && !item.disabled ? (
-                        <span className="absolute right-2 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-emerald-600 ring-2 ring-emerald-100" />
+                        <span className="absolute right-2 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-slate-500" />
                       ) : null}
                     </>
                   )

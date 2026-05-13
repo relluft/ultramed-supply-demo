@@ -242,7 +242,7 @@ export function SupplierOrdersPage() {
                                 event.stopPropagation()
                                 handleDownloadOrderExcel(order)
                               }}
-                              className="group inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md border border-emerald-200 bg-white px-2.5 text-xs font-normal text-emerald-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/20"
+                              className="group inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md border border-emerald-200 bg-white/82 px-2.5 text-xs font-normal text-emerald-800 shadow-sm transition hover:border-emerald-300 hover:bg-white hover:text-emerald-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/20"
                               title={`Выгрузить ${order.id} в Excel`}
                             >
                               <span className="inline-flex size-5 items-center justify-center rounded bg-emerald-600 text-white transition group-hover:bg-emerald-700">
@@ -256,7 +256,7 @@ export function SupplierOrdersPage() {
                         {expanded ? (
                           <tr key={`${order.id}-details`} className="bg-white">
                             <td colSpan={9} className="border-b border-slate-200 bg-white p-0">
-                              <div className="border-l-4 border-emerald-200 bg-slate-50/60 px-3 py-3">
+                              <div className="app-section-band border-l-4 border-emerald-200 px-3 py-3">
                                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                                   <div>
                                     <div className="text-sm font-normal text-slate-950">Детализация заказа {order.id}</div>

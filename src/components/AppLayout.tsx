@@ -1,7 +1,7 @@
 import { LogOut, RotateCcw, UserRound } from 'lucide-react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useDemo } from '../context'
-import { roleLabels } from '../lib/demoLogic'
+import { getRoomByRole, roleLabels } from '../lib/demoLogic'
 import { cn } from '../lib/format'
 import { Button } from './ui'
 import { WorkspaceSidebar } from './WorkspaceSidebar'
@@ -10,11 +10,14 @@ export function AppLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const {
-    state: { role },
+    state: { role, rooms },
     resetDemo,
   } = useDemo()
   const isNurse = role.startsWith('nurse-')
+  const isNurseCabinet = isNurse && location.pathname === '/cabinet'
   const isNurseRequestWorkspace = isNurse && location.pathname === '/cabinet' && location.hash === '#request'
+  const room = getRoomByRole(rooms, role)
+  const cabinetSubtitle = [room?.title, room?.type].filter(Boolean).join(' · ')
 
   function handleResetDemo() {
     if (!window.confirm('Сбросить демо и удалить все произведенные действия?')) return
@@ -25,19 +28,29 @@ export function AppLayout() {
   const header = (
     <header
       className={cn(
-        'flex min-h-[58px] items-center justify-end gap-3 rounded-lg border border-slate-200/80 bg-white px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.035)]',
+        'app-topbar flex min-h-[58px] items-center justify-between gap-3 rounded-lg border px-4 py-2',
         isNurseRequestWorkspace && 'lg:ml-[194px]',
       )}
     >
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      {isNurseCabinet ? (
+        <div className="app-content-layer min-w-0">
+          <div className="truncate text-lg font-normal text-slate-950">Кабинет {room?.number ?? ''}</div>
+          {cabinetSubtitle ? <div className="mt-0.5 truncate text-sm text-slate-600">{cabinetSubtitle}</div> : null}
+        </div>
+      ) : (
+        <div />
+      )}
+      <div className="app-content-layer flex flex-wrap items-center justify-end gap-2">
         <Button variant="ghost" className="min-h-8 px-2 py-1 text-xs font-normal text-slate-400 hover:text-slate-700" onClick={handleResetDemo}>
           <RotateCcw size={14} />
           Сбросить демо
         </Button>
-        <div className="flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-normal text-slate-700">
-          <UserRound size={16} className="text-slate-500" />
-          {roleLabels[role]}
-        </div>
+        {!isNurseCabinet ? (
+          <div className="app-soft-card flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-normal text-slate-700">
+            <UserRound size={16} className="text-slate-500" />
+            {roleLabels[role]}
+          </div>
+        ) : null}
         <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => navigate('/')}>
           <LogOut size={16} />
           Выйти
@@ -47,8 +60,8 @@ export function AppLayout() {
   )
 
   return (
-    <div className="h-screen overflow-hidden bg-[#f4f7f8]">
-      <div className="relative flex h-full w-full flex-col gap-3 p-3 lg:flex-row lg:pl-2">
+    <div className="app-workspace-bg h-screen overflow-hidden">
+      <div className="relative z-10 flex h-full w-full flex-col gap-3 p-3 lg:flex-row lg:pl-2">
         <div className={cn(isNurseRequestWorkspace && 'lg:absolute lg:left-1 lg:top-0 lg:z-20')}>
           <WorkspaceSidebar />
         </div>

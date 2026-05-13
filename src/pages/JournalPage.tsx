@@ -45,9 +45,9 @@ export function JournalPage() {
               const item = event.itemId ? catalog.find((candidate) => candidate.id === event.itemId) : undefined
               const room = event.roomId ? rooms.find((candidate) => candidate.id === event.roomId) : undefined
               return (
-                <div key={event.id} className="grid gap-3 rounded-md border border-slate-200 p-3 md:grid-cols-[180px,minmax(0,1fr),180px]">
+                <div key={event.id} className="app-soft-card grid gap-3 rounded-md border p-3 md:grid-cols-[180px,minmax(0,1fr),180px]">
                   <div className="flex items-start gap-2">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-50 text-emerald-700">
+                    <div className="app-soft-card flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-emerald-700">
                       <ClipboardList size={16} />
                     </div>
                     <div>

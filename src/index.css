@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,100..900;1,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,100..900;1,100..900&family=Manrope:wght@500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -74,6 +74,151 @@ img {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(23, 23, 23, 0.28);
+}
+
+.app-workspace-bg {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 50% 42%, #ffffff 0%, #ffffff 22%, #eef9f4 45%, #cfe8df 72%, #174b41 100%);
+  background-size: 150% 150%;
+  animation: workspace-gradient-flow 28s ease-in-out infinite;
+}
+
+.app-workspace-bg::before,
+.app-workspace-bg::after {
+  content: "";
+  position: absolute;
+  inset: -8%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.app-workspace-bg::before {
+  opacity: 0.78;
+  background-image:
+    radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.9) 0%, transparent 31%),
+    radial-gradient(circle at 80% 75%, rgba(180, 236, 212, 0.26) 0%, transparent 34%),
+    radial-gradient(circle at 48% 48%, rgba(121, 226, 166, 0.20) 0%, transparent 46%);
+  animation: workspace-ambient-breathe 24s ease-in-out infinite;
+}
+
+.app-workspace-bg::after {
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 45%, transparent 0%, transparent 58%, rgba(5, 47, 43, 0.16) 100%),
+    linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.22) 38%, rgba(179, 237, 211, 0.15) 49%, rgba(255, 255, 255, 0.18) 60%, transparent 100%);
+  filter: blur(0.2px);
+}
+
+.app-workspace-bg > * {
+  position: relative;
+  z-index: 1;
+}
+
+.app-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.92) 22%, rgba(238, 249, 244, 0.92) 45%, rgba(207, 232, 223, 0.9) 72%, rgba(23, 75, 65, 0.72) 100%);
+}
+
+.app-modal-backdrop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 45%, transparent 0%, transparent 58%, rgba(5, 47, 43, 0.12) 100%),
+    linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.22) 38%, rgba(179, 237, 211, 0.15) 49%, rgba(255, 255, 255, 0.18) 60%, transparent 100%);
+}
+
+.app-modal-backdrop > * {
+  position: relative;
+  z-index: 1;
+}
+
+.app-panel,
+.app-topbar,
+.app-sidebar,
+.app-soft-card {
+  border-color: rgba(203, 213, 225, 0.86) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  box-shadow: none !important;
+  backdrop-filter: none;
+}
+
+.app-panel {
+  position: relative;
+}
+
+.app-panel::before,
+.app-topbar::before,
+.app-sidebar::before,
+.app-soft-card::before {
+  content: none;
+}
+
+.app-topbar,
+.app-sidebar,
+.app-soft-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.app-panel > *,
+.app-topbar > *,
+.app-sidebar > *,
+.app-soft-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.app-content-layer {
+  position: relative;
+  z-index: 1;
+}
+
+.app-section-band {
+  background: rgba(248, 250, 252, 0.88) !important;
+}
+
+.app-field {
+  border-color: rgba(203, 213, 225, 0.95) !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  box-shadow: none !important;
+}
+
+.app-field:focus {
+  border-color: #267e63 !important;
+  box-shadow: 0 0 0 2px rgba(38, 126, 99, 0.10) !important;
+}
+
+.app-workspace-bg :where(.shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl, [class*="shadow-"]) {
+  box-shadow: none !important;
+}
+
+.app-workspace-bg button:hover {
+  transform: none !important;
+}
+
+.app-panel table,
+.app-sidebar table,
+.app-topbar table {
+  backdrop-filter: none;
+}
+
+@keyframes workspace-gradient-flow {
+  0%, 100% { background-position: 46% 48%; }
+  35% { background-position: 52% 42%; }
+  70% { background-position: 56% 58%; }
+}
+
+@keyframes workspace-ambient-breathe {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.76; }
+  50% { transform: translate3d(2.2%, -1.4%, 0) scale(1.055); opacity: 1; }
 }
 
 .panel {

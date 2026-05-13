@@ -424,13 +424,13 @@ export function ReceiptPage() {
             </div>
           </div>
           {filtersOpen ? (
-            <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 md:grid-cols-5">
+            <div className="app-section-band grid gap-2 border-b border-slate-200 px-3 py-2 md:grid-cols-5">
               <label className="grid gap-1 text-xs text-slate-500">
                 Поставщик
                 <select
                   value={supplierFilter}
                   onChange={(event) => setSupplierFilter(event.target.value)}
-                  className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 outline-none"
+                  className="app-field h-8 rounded-md border px-2 text-xs text-slate-900 outline-none"
                 >
                   <option value="all">Все</option>
                   {filterSuppliers.map(([id, name]) => (
@@ -443,7 +443,7 @@ export function ReceiptPage() {
                 <select
                   value={orderFilter}
                   onChange={(event) => setOrderFilter(event.target.value)}
-                  className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 outline-none"
+                  className="app-field h-8 rounded-md border px-2 text-xs text-slate-900 outline-none"
                 >
                   <option value="all">Все</option>
                   {filterOrders.map((id) => (
@@ -456,7 +456,7 @@ export function ReceiptPage() {
                 <select
                   value={requestFilter}
                   onChange={(event) => setRequestFilter(event.target.value)}
-                  className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 outline-none"
+                  className="app-field h-8 rounded-md border px-2 text-xs text-slate-900 outline-none"
                 >
                   <option value="all">Все</option>
                   {filterRequests.map((id) => (
@@ -469,7 +469,7 @@ export function ReceiptPage() {
                 <select
                   value={statusFilter}
                   onChange={(event) => setStatusFilter(event.target.value as 'all' | ReceiptStatusFilter)}
-                  className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 outline-none"
+                  className="app-field h-8 rounded-md border px-2 text-xs text-slate-900 outline-none"
                 >
                   <option value="all">Все</option>
                   <option value="waiting">Ожидает прихода</option>
@@ -686,7 +686,7 @@ export function ReceiptPage() {
             </table>
           </div>
 
-          <div className="grid shrink-0 gap-2 border-t border-slate-200 bg-white px-3 py-2 text-sm">
+          <div className="app-section-band grid shrink-0 gap-2 border-t border-slate-200 px-3 py-2 text-sm">
             <div className="flex flex-wrap gap-4">
               <span className="text-slate-500">Заказано: <span className="text-slate-950">{formatNumber(totalQuantity)}</span></span>
               <span className="text-slate-500">К принятию сейчас: <span className="text-slate-950">{formatNumber(receivedNowTotal)}</span></span>

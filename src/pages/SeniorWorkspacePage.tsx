@@ -2,6 +2,7 @@ import {
   BookOpen,
   ArrowLeft,
   Check,
+  CheckCircle2,
   ChevronRight,
   ClipboardList,
   ListFilter,
@@ -14,8 +15,9 @@ import {
   ShoppingCart,
   Truck,
 } from 'lucide-react'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { BrandedLoadingModal } from '../components/BrandedLoadingModal'
 import { PageTransition } from '../components/PageTransition'
 import { Button, EmptyState, StatusPill, fieldStyles } from '../components/ui'
 import { useDemo } from '../context'
@@ -43,6 +45,7 @@ const detailTableCell = cn(compactTableCell, 'border-r border-slate-100 last:bor
 type IssueDraft =
   | { mode: 'full' }
   | { mode: 'partial'; quantity: string }
+type IssueConfirmationStatus = 'idle' | 'loading' | 'done'
 
 const seniorDashboardGroups = [
   {
@@ -151,6 +154,7 @@ function ToolIconButton({
 
 export function SeniorWorkspacePage() {
   const location = useLocation()
+  const issueFinishTimerRef = useRef<number | null>(null)
   const {
     state: { rooms, catalog, stock, requests, replenishment, activeRequestId },
     setActiveRequest,
@@ -163,6 +167,7 @@ export function SeniorWorkspacePage() {
   const [selectedCategory, setSelectedCategory] = useState(allCategory)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [issueDrafts, setIssueDrafts] = useState<Record<string, IssueDraft>>({})
+  const [issueConfirmationStatus, setIssueConfirmationStatus] = useState<IssueConfirmationStatus>('idle')
   const [openedRequestId, setOpenedRequestId] = useState<string | null>(null)
   const [overviewFiltersOpen, setOverviewFiltersOpen] = useState(false)
   const [overviewQuery, setOverviewQuery] = useState('')
@@ -274,6 +279,14 @@ export function SeniorWorkspacePage() {
   }, [activeRequestId, setActiveRequest, sortedRequests])
 
   useEffect(() => {
+    return () => {
+      if (issueFinishTimerRef.current) {
+        window.clearTimeout(issueFinishTimerRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     setIssueDrafts({})
   }, [selectedRequest?.id])
 
@@ -352,17 +365,25 @@ export function SeniorWorkspacePage() {
   }
 
   function confirmIssueDrafts() {
-    if (!selectedRequest) return
+    if (!selectedRequest || !validIssueDrafts.length || issueConfirmationStatus === 'loading') return
 
-    validIssueDrafts.forEach(([lineId, draft]) => {
-      if (draft.mode === 'full') {
-        issueFullLine(selectedRequest.id, lineId)
-        return
-      }
+    const requestId = selectedRequest.id
+    const draftsToIssue = validIssueDrafts.map(([lineId, draft]) => [lineId, { ...draft }] as const)
 
-      issuePartialLine(selectedRequest.id, lineId, Math.round(Number(draft.quantity) || 0))
-    })
-    setIssueDrafts({})
+    setIssueConfirmationStatus('loading')
+    issueFinishTimerRef.current = window.setTimeout(() => {
+      draftsToIssue.forEach(([lineId, draft]) => {
+        if (draft.mode === 'full') {
+          issueFullLine(requestId, lineId)
+          return
+        }
+
+        issuePartialLine(requestId, lineId, Math.round(Number(draft.quantity) || 0))
+      })
+      setIssueDrafts({})
+      setIssueConfirmationStatus('done')
+      issueFinishTimerRef.current = null
+    }, 2000)
   }
 
   function prepareAvailableIssue() {
@@ -439,7 +460,7 @@ export function SeniorWorkspacePage() {
     const creatorName = selectedRequestRoom?.nurseName || selectedRequest.createdBy
 
     return (
-      <div className="grid min-w-0 gap-3 rounded-md border border-slate-200 bg-slate-50/80 px-3 py-2 text-xs text-slate-500 xl:grid-cols-[0.9fr_1.25fr_0.85fr_1.8fr]">
+      <div className="app-soft-card grid min-w-0 gap-3 rounded-md border px-3 py-2 text-xs text-slate-500 xl:grid-cols-[0.9fr_1.25fr_0.85fr_1.8fr]">
         <div className="min-w-0 border-r border-slate-200 pr-3">
           <div className="mb-1 text-[11px] font-semibold uppercase text-slate-400">Кабинет</div>
           <div className="text-sm font-semibold text-slate-950">{requestCabinetLabel(selectedRequest)}</div>
@@ -472,7 +493,7 @@ export function SeniorWorkspacePage() {
 
   function renderRequestsOverview() {
     return (
-      <div className="min-h-0 flex-1 overflow-auto bg-slate-50/60 p-3">
+      <div className="app-section-band min-h-0 flex-1 overflow-auto p-3">
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
           <table className="w-full table-fixed border-separate border-spacing-0">
             <thead>
@@ -542,14 +563,14 @@ export function SeniorWorkspacePage() {
   if (!location.hash) {
     return (
       <PageTransition className="grid gap-4">
-        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <section className="app-panel rounded-lg border p-4">
           <h1 className="text-2xl font-semibold text-slate-950">Главная</h1>
           <p className="mt-1 text-sm text-slate-500">Выберите, с чего начать</p>
         </section>
 
         <section className="grid gap-3">
           {seniorDashboardGroups.map((group) => (
-            <div key={group.title} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div key={group.title} className="app-panel rounded-lg border p-4">
               <div className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">{group.title}</div>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 {group.items.map((item) => {
@@ -559,9 +580,9 @@ export function SeniorWorkspacePage() {
                     <Link
                       key={item.to}
                       to={item.to}
-                      className="group min-h-[126px] rounded-lg border border-slate-200 bg-slate-50/60 p-4 transition hover:border-emerald-200 hover:bg-emerald-50/60 hover:shadow-sm"
+                      className="app-soft-card group min-h-[126px] rounded-lg border p-4 transition hover:border-emerald-200 hover:bg-emerald-50/60 hover:shadow-sm"
                     >
-                      <div className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-emerald-800 transition group-hover:border-emerald-200">
+                      <div className="app-soft-card flex h-9 w-9 items-center justify-center rounded-md border text-emerald-800 transition group-hover:border-emerald-200">
                         <Icon size={18} />
                       </div>
                       <div className="mt-3 text-base font-semibold text-slate-950">{item.label}</div>
@@ -581,7 +602,7 @@ export function SeniorWorkspacePage() {
     <PageTransition className="h-full min-h-0 overflow-hidden">
       <section className="flex h-full min-h-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         {!isRequestOverview ? (
-          <aside className="hidden min-h-0 w-[270px] shrink-0 flex-col border-r border-slate-200 bg-slate-50/80 xl:flex">
+          <aside className="app-section-band hidden min-h-0 w-[270px] shrink-0 flex-col border-r border-slate-200 xl:flex">
             <div className="min-h-0 flex-1 overflow-auto p-3">
               {isRequestsMode ? (
                 <button
@@ -591,7 +612,7 @@ export function SeniorWorkspacePage() {
                     setSelectedCategory(allCategory)
                     setQuery('')
                   }}
-                  className="mb-3 inline-flex h-8 w-auto items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800"
+                  className="mb-3 inline-flex h-8 w-auto items-center gap-1.5 rounded-md border border-[#b9decf] bg-white/82 px-2.5 text-xs font-semibold text-[#587367] transition hover:border-emerald-300 hover:bg-white hover:text-emerald-800"
                   title="Вернуться к списку заявок"
                 >
                   <ArrowLeft size={14} />
@@ -708,7 +729,7 @@ export function SeniorWorkspacePage() {
             </div>
 
             {isRequestOverview && overviewFiltersOpen ? (
-              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-slate-50/70 p-2">
+              <div className="app-soft-card mt-3 flex flex-wrap items-center gap-2 rounded-md border p-2">
                 <label className="relative min-w-[260px] flex-1">
                   <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                   <input
@@ -722,7 +743,7 @@ export function SeniorWorkspacePage() {
                   <button
                     type="button"
                     onClick={() => setOverviewQuery('')}
-                    className="h-9 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-950"
+                    className="h-9 rounded-md border border-[#b9decf] bg-white/82 px-3 text-xs font-semibold text-[#587367] transition hover:bg-white hover:text-[#17362d]"
                   >
                     Сбросить
                   </button>
@@ -732,7 +753,7 @@ export function SeniorWorkspacePage() {
 
             {!isRequestOverview ? (
               <div className="mt-4 grid gap-3 xl:grid-cols-[260px_minmax(0,1fr)] xl:items-stretch">
-                <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50/70 p-2">
+                <div className="app-soft-card grid gap-2 rounded-md border p-2">
                   <select
                     value={selectedCategory}
                     onChange={(event) => setSelectedCategory(event.target.value)}
@@ -765,7 +786,7 @@ export function SeniorWorkspacePage() {
             renderRequestsOverview()
           ) : (
             <>
-          <div className="flex min-h-0 flex-1 flex-col bg-slate-50/60 p-3">
+          <div className="app-section-band flex min-h-0 flex-1 flex-col p-3">
             <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
               <div className="h-full overflow-y-auto overflow-x-hidden">
             <table className="w-full table-fixed border-separate border-spacing-0">
@@ -983,13 +1004,13 @@ export function SeniorWorkspacePage() {
               </div>
             </div>
 
-            <div className="mt-2 flex shrink-0 flex-wrap items-center justify-end gap-3 rounded-md border border-slate-200 bg-white px-3 py-2">
+            <div className="app-soft-card mt-2 flex shrink-0 flex-wrap items-center justify-end gap-3 rounded-md border px-3 py-2">
               <div className="text-right text-xs text-slate-500">
                 {validIssueDrafts.length
                   ? `К выдаче: ${fullIssueDraftCount}; частично: ${partialIssueDraftCount}`
                   : 'Выберите строки для выдачи'}
               </div>
-              <Button variant="primary" disabled={!validIssueDrafts.length} onClick={confirmIssueDrafts}>
+              <Button variant="primary" disabled={!validIssueDrafts.length || issueConfirmationStatus === 'loading'} onClick={confirmIssueDrafts}>
                 <PackageCheck size={16} />
                 Подтвердить и выдать
               </Button>
@@ -999,6 +1020,27 @@ export function SeniorWorkspacePage() {
           )}
         </section>
       </section>
+
+      {issueConfirmationStatus === 'loading' ? (
+        <BrandedLoadingModal title="Проводим выдачу материалов" />
+      ) : null}
+
+      {issueConfirmationStatus === 'done' ? (
+        <div className="app-modal-backdrop z-[60] flex items-center justify-center px-4 py-6 backdrop-blur-sm">
+          <div className="app-panel flex w-full max-w-md flex-col items-center rounded-xl border px-7 py-7 text-center shadow-2xl">
+            <div className="flex size-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+              <CheckCircle2 size={32} />
+            </div>
+            <div className="mt-4 text-2xl font-normal text-slate-950">Выдача произведена</div>
+            <div className="mt-2 text-sm leading-6 text-slate-600">
+              Материалы списаны со склада, статусы заявки обновлены.
+            </div>
+            <Button className="mt-6 w-full max-w-48" onClick={() => setIssueConfirmationStatus('idle')}>
+              Закрыть
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </PageTransition>
   )
 }

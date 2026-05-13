@@ -129,7 +129,7 @@ export function CatalogPage() {
         <div className="mt-4 grid gap-2">
           {manualLines.length ? (
             manualLines.map(({ request, line, room }) => (
-              <div key={line.id} className="rounded-md border border-slate-200 p-3">
+              <div key={line.id} className="app-soft-card rounded-md border p-3">
                 <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                   <div>
                     <div className="font-semibold text-slate-950">{line.manualName}</div>
