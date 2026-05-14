@@ -221,6 +221,17 @@ img {
   50% { transform: translate3d(2.2%, -1.4%, 0) scale(1.055); opacity: 1; }
 }
 
+@media (max-width: 900px), (pointer: coarse) {
+  .app-workspace-bg,
+  .app-workspace-bg::before {
+    animation: none !important;
+  }
+
+  .app-workspace-bg::after {
+    filter: none;
+  }
+}
+
 .panel {
   position: relative;
 }

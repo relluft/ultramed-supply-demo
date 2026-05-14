@@ -102,7 +102,10 @@ export function StartPage() {
     }
 
     if (loginStep === 'loading') {
-      const timer = window.setTimeout(() => setLoginStep('splash'), 650)
+      const timer = window.setTimeout(() => {
+        setModalOpen(false)
+        setLoginStep('splash')
+      }, 650)
       return () => window.clearTimeout(timer)
     }
 
@@ -255,9 +258,32 @@ export function StartPage() {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
+
+        @media (max-width: 900px), (pointer: coarse) {
+          .landing-shell,
+          .landing-shell [class*="animation:landing-"] {
+            animation: none !important;
+          }
+
+          .landing-shell .pointer-events-none.absolute[class*="blur-"] {
+            display: none !important;
+          }
+
+          .landing-shell [class*="backdrop-blur"] {
+            -webkit-backdrop-filter: none !important;
+            backdrop-filter: none !important;
+          }
+
+          .landing-auth-overlay,
+          .landing-splash {
+            backface-visibility: hidden;
+            contain: layout paint;
+            transform: translateZ(0);
+          }
+        }
       `}</style>
       <div
-        className="relative min-h-screen overflow-hidden bg-[#eaf6f1] text-[#17362d] [background:radial-gradient(circle_at_50%_44%,#ffffff_0%,#ffffff_30%,#eef9f4_48%,#cfe8df_72%,#174b41_100%)] [background-size:150%_150%] [animation:landing-gradient-flow_28s_ease-in-out_infinite]"
+        className="landing-shell relative min-h-screen overflow-hidden bg-[#eaf6f1] text-[#17362d] [background:radial-gradient(circle_at_50%_44%,#ffffff_0%,#ffffff_30%,#eef9f4_48%,#cfe8df_72%,#174b41_100%)] [background-size:150%_150%] [animation:landing-gradient-flow_28s_ease-in-out_infinite]"
         onPointerMove={handleLandingPointerMove}
         onPointerLeave={handleLandingPointerLeave}
       >
@@ -325,7 +351,7 @@ export function StartPage() {
       <AnimatePresence>
         {modalOpen ? (
           <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#eaf6f1]/82 px-4 py-6 backdrop-blur-xl"
+            className="landing-auth-overlay fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#eaf6f1]/82 px-4 py-6 backdrop-blur-xl"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -517,7 +543,7 @@ export function StartPage() {
       <AnimatePresence>
         {loginStep === 'splash' ? (
           <motion.div
-            className="fixed inset-0 z-[60] grid place-items-center overflow-hidden bg-[#eaf6f1] px-8 [background:radial-gradient(circle_at_50%_42%,#ffffff_0%,#eef9f4_36%,#cfe8df_70%,#174b41_100%)] [background-size:150%_150%] [animation:landing-gradient-flow_18s_ease-in-out_infinite]"
+            className="landing-splash fixed inset-0 z-[60] grid place-items-center overflow-hidden bg-[#eaf6f1] px-8 [background:radial-gradient(circle_at_50%_42%,#ffffff_0%,#eef9f4_36%,#cfe8df_70%,#174b41_100%)] [background-size:150%_150%] [animation:landing-gradient-flow_18s_ease-in-out_infinite]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

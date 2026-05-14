@@ -1,4 +1,3 @@
-import { AnimatePresence } from 'framer-motion'
 import { useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppLayout } from './components/AppLayout'
@@ -52,104 +51,102 @@ function AnimatedRoutes() {
   const location = useLocation()
 
   return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        <Route index element={<StartPage />} />
+    <Routes location={location}>
+      <Route index element={<StartPage />} />
 
-        <Route element={<AppLayout />}>
-          <Route
-            path="/cabinet"
-            element={
-              <RequireNurse>
-                <NurseCabinetPage />
-              </RequireNurse>
-            }
-          />
-          <Route
-            path="/senior"
-            element={
-              <RequireSenior>
-                <SeniorWorkspacePage />
-              </RequireSenior>
-            }
-          />
-          <Route
-            path="/stock"
-            element={
-              <RequireSenior>
-                <StockPage />
-              </RequireSenior>
-            }
-          />
-          <Route
-            path="/replenishment"
-            element={
-              <RequireSenior>
-                <ReplenishmentPage />
-              </RequireSenior>
-            }
-          />
-          <Route
-            path="/orders/forming"
-            element={
-              <RequireSenior>
-                <SupplierOrderFormationPage />
-              </RequireSenior>
-            }
-          />
-          <Route
-            path="/orders"
-            element={
-              <RequireSenior>
-                <SupplierOrdersPage />
-              </RequireSenior>
-            }
-          />
-          <Route
-            path="/receipt"
-            element={
-              <RequireSenior>
-                <ReceiptPage />
-              </RequireSenior>
-            }
-          />
-          <Route
-            path="/suppliers"
-            element={
-              <RequireSenior>
-                <SuppliersPage />
-              </RequireSenior>
-            }
-          />
-          <Route
-            path="/catalog"
-            element={
-              <RequireSenior>
-                <CatalogPage />
-              </RequireSenior>
-            }
-          />
-          <Route
-            path="/journal"
-            element={
-              <RequireSenior>
-                <JournalPage />
-              </RequireSenior>
-            }
-          />
-          <Route
-            path="/analytics"
-            element={
-              <RequireSenior>
-                <AnalyticsPage />
-              </RequireSenior>
-            }
-          />
-        </Route>
+      <Route element={<AppLayout />}>
+        <Route
+          path="/cabinet"
+          element={
+            <RequireNurse>
+              <NurseCabinetPage />
+            </RequireNurse>
+          }
+        />
+        <Route
+          path="/senior"
+          element={
+            <RequireSenior>
+              <SeniorWorkspacePage />
+            </RequireSenior>
+          }
+        />
+        <Route
+          path="/stock"
+          element={
+            <RequireSenior>
+              <StockPage />
+            </RequireSenior>
+          }
+        />
+        <Route
+          path="/replenishment"
+          element={
+            <RequireSenior>
+              <ReplenishmentPage />
+            </RequireSenior>
+          }
+        />
+        <Route
+          path="/orders/forming"
+          element={
+            <RequireSenior>
+              <SupplierOrderFormationPage />
+            </RequireSenior>
+          }
+        />
+        <Route
+          path="/orders"
+          element={
+            <RequireSenior>
+              <SupplierOrdersPage />
+            </RequireSenior>
+          }
+        />
+        <Route
+          path="/receipt"
+          element={
+            <RequireSenior>
+              <ReceiptPage />
+            </RequireSenior>
+          }
+        />
+        <Route
+          path="/suppliers"
+          element={
+            <RequireSenior>
+              <SuppliersPage />
+            </RequireSenior>
+          }
+        />
+        <Route
+          path="/catalog"
+          element={
+            <RequireSenior>
+              <CatalogPage />
+            </RequireSenior>
+          }
+        />
+        <Route
+          path="/journal"
+          element={
+            <RequireSenior>
+              <JournalPage />
+            </RequireSenior>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <RequireSenior>
+              <AnalyticsPage />
+            </RequireSenior>
+          }
+        />
+      </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </AnimatePresence>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
 
