@@ -1,0 +1,25 @@
+{
+  "name": "UltraMed Supply",
+  "short_name": "UltraMed",
+  "id": "/",
+  "description": "UltraMed Supply demo application",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "background_color": "#f7faf7",
+  "theme_color": "#4e7660",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
