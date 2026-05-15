@@ -111,7 +111,7 @@ export function WorkspaceSidebar() {
   return (
     <aside
       className={cn(
-        'app-sidebar rounded-lg border p-2 lg:sticky lg:top-3 lg:shrink-0',
+        'app-sidebar rounded-lg border p-2 lg:sticky lg:top-0 lg:shrink-0',
         isNurse ? 'lg:h-auto lg:w-[186px] lg:self-start' : 'lg:h-[calc(100vh-1.5rem)] lg:w-[218px]',
       )}
     >

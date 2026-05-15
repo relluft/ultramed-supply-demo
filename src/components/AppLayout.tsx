@@ -61,8 +61,8 @@ export function AppLayout() {
 
   return (
     <div className="app-workspace-bg h-screen overflow-hidden">
-      <div className="relative z-10 flex h-full w-full flex-col gap-3 p-3 lg:flex-row lg:pl-2">
-        <div className={cn(isNurseRequestWorkspace && 'lg:absolute lg:left-1 lg:top-0 lg:z-20')}>
+      <div className="relative z-10 flex h-full w-full flex-col items-stretch gap-3 p-3 lg:flex-row lg:items-start lg:pl-2">
+        <div className={cn('lg:flex lg:shrink-0', isNurseRequestWorkspace && 'lg:absolute lg:left-2 lg:top-3 lg:z-20')}>
           <WorkspaceSidebar />
         </div>
 
