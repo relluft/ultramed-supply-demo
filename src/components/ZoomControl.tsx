@@ -1,11 +1,23 @@
 import { Minus, Plus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { cn } from '../lib/format'
 
 const ZOOM_STORAGE_KEY = 'ultramed-ui-zoom'
 const ZOOM_STEP = 0.05
 const MIN_ZOOM = 0.8
 const MAX_ZOOM = 1.25
+const TABLE_ROUTES = new Set([
+  '/cabinet',
+  '/senior',
+  '/stock',
+  '/replenishment',
+  '/orders/forming',
+  '/orders',
+  '/receipt',
+  '/catalog',
+  '/analytics',
+])
 
 function clampZoom(value: number) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value))
@@ -25,16 +37,23 @@ function readStoredZoom() {
 }
 
 export function ZoomControl() {
+  const location = useLocation()
   const [zoom, setZoom] = useState(() => readStoredZoom())
+  const isTableRoute = TABLE_ROUTES.has(location.pathname)
 
   useEffect(() => {
+    if (!isTableRoute) {
+      document.documentElement.style.setProperty('--app-zoom', '1')
+      return
+    }
+
     document.documentElement.style.setProperty('--app-zoom', String(zoom))
     try {
       window.localStorage.setItem(ZOOM_STORAGE_KEY, String(zoom))
     } catch {
       // Storage can be unavailable in restricted browser modes.
     }
-  }, [zoom])
+  }, [isTableRoute, zoom])
 
   const percent = useMemo(() => `${Math.round(zoom * 100)}%`, [zoom])
   const isDefault = Math.abs(zoom - 1) < 0.001
@@ -42,6 +61,8 @@ export function ZoomControl() {
   function changeZoom(delta: number) {
     setZoom((current) => clampZoom(Number((current + delta).toFixed(2))))
   }
+
+  if (!isTableRoute) return null
 
   return (
     <div

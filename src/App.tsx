@@ -156,8 +156,8 @@ function App() {
     <DemoProvider>
       <BrowserRouter>
         <AnimatedRoutes />
+        <ZoomControl />
       </BrowserRouter>
-      <ZoomControl />
     </DemoProvider>
   )
 }
