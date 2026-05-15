@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppLayout } from './components/AppLayout'
+import { ZoomControl } from './components/ZoomControl'
 import { DemoProvider, useDemo } from './context'
 import { AnalyticsPage } from './pages/AnalyticsPage'
 import { CatalogPage } from './pages/CatalogPage'
@@ -156,6 +157,7 @@ function App() {
       <BrowserRouter>
         <AnimatedRoutes />
       </BrowserRouter>
+      <ZoomControl />
     </DemoProvider>
   )
 }

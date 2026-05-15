@@ -7,6 +7,7 @@
 
 :root {
   --page-bg: #f7f7f7;
+  --app-zoom: 1;
 }
 
 * {
@@ -52,6 +53,7 @@ img {
 
 #root {
   min-height: 100vh;
+  zoom: var(--app-zoom);
 }
 
 ::selection {
