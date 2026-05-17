@@ -268,7 +268,7 @@ export function ReplenishmentPage() {
       formSupplierOrders(orderReadyLines.map((line) => line.id))
       setIsFormingOrder(false)
       setOrderReadyModalOpen(true)
-    }, 2000)
+    }, 1000)
   }
 
   function handleDownloadSupplierInquiryExcel(group: (typeof supplierInquiryGroups)[number]) {

@@ -138,7 +138,7 @@ export function SupplierOrderFormationPage() {
         .filter((order) => order.status === 'draft' || order.status === 'ready-to-order')
         .forEach((order) => markOrderAsOrdered(order.id))
       setFormationStatus('done')
-    }, 2000)
+    }, 1000)
   }
 
   return (

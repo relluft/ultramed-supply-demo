@@ -97,7 +97,7 @@ export function StartPage() {
     if (!selectedRole || loginStep === 'idle' || !selectedProfile) return undefined
 
     if (loginStep === 'typing') {
-      const timer = window.setTimeout(() => setLoginStep('loading'), 650)
+      const timer = window.setTimeout(() => setLoginStep('loading'), 325)
       return () => window.clearTimeout(timer)
     }
 
@@ -105,14 +105,14 @@ export function StartPage() {
       const timer = window.setTimeout(() => {
         setModalOpen(false)
         setLoginStep('splash')
-      }, 650)
+      }, 325)
       return () => window.clearTimeout(timer)
     }
 
     const navigateTimer = window.setTimeout(() => {
       startDemo(selectedRole)
       navigate(selectedProfile.route)
-    }, 2500)
+    }, 1250)
 
     return () => window.clearTimeout(navigateTimer)
   }, [loginStep, navigate, selectedProfile, selectedRole, startDemo])
@@ -132,7 +132,7 @@ export function StartPage() {
     setManualLogin('')
     setManualPassword('')
     setAuthError('')
-    window.setTimeout(() => setLoginStep('typing'), 250)
+    window.setTimeout(() => setLoginStep('typing'), 125)
   }
 
   function closeAuth() {
@@ -528,7 +528,7 @@ export function StartPage() {
                             className="h-full rounded-full bg-[linear-gradient(90deg,#6edb9f_0%,#267e63_58%,#b9efcf_100%)] shadow-[0_0_18px_rgba(110,219,159,0.42)]"
                             initial={{ width: '18%' }}
                             animate={{ width: loginStep === 'typing' ? '58%' : loginStep === 'loading' ? '86%' : '100%' }}
-                            transition={{ duration: 0.55 }}
+                            transition={{ duration: 0.275 }}
                           />
                         </div>
                       </div>
@@ -569,7 +569,7 @@ export function StartPage() {
                   className="h-full rounded-full bg-[linear-gradient(90deg,#6edb9f_0%,#267e63_58%,#b9efcf_100%)] shadow-[0_0_18px_rgba(110,219,159,0.42)]"
                   initial={{ width: '18%' }}
                   animate={{ width: '100%' }}
-                  transition={{ duration: 2.35, ease: 'easeOut' }}
+                  transition={{ duration: 1.175, ease: 'easeOut' }}
                 />
               </div>
             </motion.div>

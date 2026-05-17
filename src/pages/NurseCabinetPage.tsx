@@ -14,7 +14,7 @@ const orthodonticDemoRequestId = 'REQ-005'
 const requestTableHeaderCell =
   'sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95 px-3 py-2 text-left text-[11px] font-normal uppercase tracking-wide text-slate-500'
 const requestTableCell = 'border-b border-slate-100 px-3 py-2 align-top text-[13px] leading-4 text-slate-700'
-const submitLoadingMs = 1500
+const submitLoadingMs = 750
 
 function ModalPortal({ children }: { children: ReactNode }) {
   if (typeof document === 'undefined') return null

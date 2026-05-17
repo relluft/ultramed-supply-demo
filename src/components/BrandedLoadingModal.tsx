@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 
 export function BrandedLoadingModal({
   title = 'Формируем заявку',
-  durationSeconds = 2,
+  durationSeconds = 1,
 }: {
   title?: string
   durationSeconds?: number
