@@ -115,24 +115,31 @@ export function WorkspaceSidebar() {
         isNurse ? 'lg:h-auto lg:w-[186px] lg:self-start' : 'lg:h-[calc(100vh-1.5rem)] lg:w-[218px]',
       )}
     >
-      <div className={cn('flex flex-col items-center justify-center rounded-md px-2.5', isNurse ? 'h-14' : 'h-16')}>
-        <img
-          src="/brand/ultramed-main-logo.svg"
-          alt="УльтраМед"
-          className={cn('h-auto max-w-full object-contain object-center', isNurse ? 'w-[132px]' : 'w-[156px]')}
-        />
-        <div className="mt-0.5 text-center text-[12px] font-normal leading-none text-[#6089bb]">
-          СНАБЖЕНИЕ
+      <div className="-mx-1 rounded-md">
+        <div
+          className={cn(
+            'flex flex-col items-center justify-center px-0',
+            isNurse ? 'h-[72px]' : 'h-[78px]',
+          )}
+        >
+          <img
+            src="/brand/ultramed-main-logo.svg"
+            alt="УльтраМед"
+            className="h-auto w-full max-w-none object-contain object-center"
+          />
+          <div className="mt-0.5 text-center text-[14px] font-normal leading-none text-[#6089bb]">
+            СНАБЖЕНИЕ
+          </div>
         </div>
       </div>
 
-      <nav className="mt-3 grid gap-3 overflow-y-auto pr-0.5">
+      <nav className="mt-3 grid gap-3 overflow-x-hidden overflow-y-auto pr-0.5">
         {groups.map((group) => {
           const GroupIcon = group.icon
 
           return (
             <section key={group.title}>
-              <div className="mb-1.5 flex items-center gap-2 px-2 text-[11px] font-normal uppercase tracking-wide text-slate-500">
+              <div className="mb-1.5 flex items-center gap-2 px-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500 [font-family:Manrope,var(--font-sans)]">
                 <GroupIcon size={13} />
                 {group.title}
               </div>
@@ -142,7 +149,7 @@ export function WorkspaceSidebar() {
                   const Icon = item.icon
                   const active = isItemActive(item.to, location.pathname, location.hash)
                   const className = cn(
-                    'relative flex min-h-7 items-center gap-2 rounded-md py-1 pl-4 pr-2 text-[13px] font-normal leading-4 transition',
+                    'relative flex min-h-7 items-center gap-2 rounded-md py-1 pl-4 pr-2 text-[23px] font-medium leading-[1.08] tracking-normal [font-family:Manrope,var(--font-sans)] transition',
                     item.disabled
                       ? 'cursor-not-allowed text-slate-400 opacity-55'
                       : active
@@ -158,7 +165,7 @@ export function WorkspaceSidebar() {
                         )}
                       />
                       <Icon size={15} className="shrink-0" />
-                      <span className="min-w-0">{item.label}</span>
+                      <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]">{item.label}</span>
                       {active && !item.disabled ? (
                         <span className="absolute right-2 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-slate-500" />
                       ) : null}

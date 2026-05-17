@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { BrandedLoadingModal } from '../components/BrandedLoadingModal'
 import { PageTransition } from '../components/PageTransition'
-import { Button, EmptyState, Panel, SectionHeader, StatusPill, fieldStyles } from '../components/ui'
+import { Button, EmptyState, Panel, StatusPill, fieldStyles } from '../components/ui'
 import { useDemo } from '../context'
 import { getRoomByRole, requestLineStatusLabels, requestStatusLabels, roleToRoomId, statusTone } from '../lib/demoLogic'
 import { cn, formatDateTime, formatNumber } from '../lib/format'
@@ -931,8 +931,6 @@ export function NurseCabinetPage() {
     )
   }
 
-  const cabinetSubtitle = [room?.title, room?.type].filter(Boolean).join(' · ')
-
   if (!location.hash) {
     const dashboardItems = [
       {
@@ -953,13 +951,6 @@ export function NurseCabinetPage() {
 
     return (
       <PageTransition className="grid gap-4">
-        <Panel>
-          <SectionHeader
-            title={`Кабинет ${room?.number ?? ''}`}
-            subtitle={cabinetSubtitle}
-          />
-        </Panel>
-
         <section className="app-panel grid min-h-[360px] content-start gap-3 rounded-lg border p-4">
           <div>
             <h2 className="text-xl font-normal text-slate-950">Выберите, с чего начать</h2>
