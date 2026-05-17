@@ -115,7 +115,7 @@ export function WorkspaceSidebar() {
         isNurse ? 'lg:h-auto lg:w-[186px] lg:self-start' : 'lg:h-[calc(100vh-1.5rem)] lg:w-[218px]',
       )}
     >
-      <div className="-mx-1 rounded-md">
+      <div className="-mx-0.5 rounded-md">
         <div
           className={cn(
             'flex flex-col items-center justify-center px-0',
@@ -139,17 +139,17 @@ export function WorkspaceSidebar() {
 
           return (
             <section key={group.title}>
-              <div className="mb-1.5 flex items-center gap-2 px-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500 [font-family:Manrope,var(--font-sans)]">
+              <div className="mb-1.5 flex items-center gap-2 px-2 text-[11px] font-medium uppercase tracking-[0.06em] text-slate-500 [font-family:Manrope,var(--font-sans)]">
                 <GroupIcon size={13} />
                 {group.title}
               </div>
-              <div className="relative grid gap-0.5 pl-2">
+              <div className="relative grid gap-0 overflow-hidden rounded-md border border-slate-200/70 bg-white/35 pl-2">
                 <div className="absolute bottom-2 left-[13px] top-1 w-px bg-slate-200" />
                 {group.items.map((item) => {
                   const Icon = item.icon
                   const active = isItemActive(item.to, location.pathname, location.hash)
                   const className = cn(
-                    'relative flex min-h-7 items-center gap-2 rounded-md py-1 pl-4 pr-2 text-[23px] font-medium leading-[1.08] tracking-normal [font-family:Manrope,var(--font-sans)] transition',
+                    'relative flex min-h-8 items-center gap-2 border-b border-slate-200/70 py-1 pl-4 pr-2 text-[20px] font-normal leading-[1.08] tracking-normal last:border-b-0 [font-family:Manrope,var(--font-sans)] transition',
                     item.disabled
                       ? 'cursor-not-allowed text-slate-400 opacity-55'
                       : active
