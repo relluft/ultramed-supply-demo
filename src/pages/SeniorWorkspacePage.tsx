@@ -834,8 +834,7 @@ export function SeniorWorkspacePage() {
                   const isLineInReplenishment = Boolean(
                     requestLine &&
                       (requestLine.status === 'not-enough' ||
-                        requestLine.status === 'waiting-replenishment' ||
-                        replenishment.some((line) => line.itemId === item.id && !line.closedAt && line.source === 'not-enough')),
+                        requestLine.status === 'waiting-replenishment'),
                   )
                   const rowTone =
                     isOutOfStockRequestLine
