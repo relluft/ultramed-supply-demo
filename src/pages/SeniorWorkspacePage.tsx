@@ -128,7 +128,7 @@ function ToolIconButton({
   icon?: ReactNode
   disabled?: boolean
   onClick?: () => void
-  tone?: 'neutral' | 'success' | 'warning' | 'danger'
+  tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'info'
   className?: string
 }) {
   return (
@@ -143,6 +143,7 @@ function ToolIconButton({
         tone === 'success' && 'border-emerald-300 bg-white text-emerald-800 hover:border-emerald-400 hover:bg-emerald-50',
         tone === 'warning' && 'border-amber-300 bg-amber-50 text-amber-900 hover:border-amber-400 hover:bg-amber-100',
         tone === 'danger' && 'border-rose-300 bg-rose-50 text-rose-800 hover:border-rose-400 hover:bg-rose-100',
+        tone === 'info' && 'border-sky-300 bg-sky-50 text-sky-800 hover:border-sky-400 hover:bg-sky-100',
         className,
       )}
     >
@@ -829,8 +830,17 @@ export function SeniorWorkspacePage() {
                   const hasPartialQuantity = Math.round(Number(partialQuantity) || 0) > 0
                   const active = selectedItem?.id === item.id
                   const isIssued = requestLine?.status === 'issued'
+                  const isOutOfStockRequestLine = Boolean(requestLine && remaining > 0 && available <= 0)
+                  const isLineInReplenishment = Boolean(
+                    requestLine &&
+                      (requestLine.status === 'not-enough' ||
+                        requestLine.status === 'waiting-replenishment' ||
+                        replenishment.some((line) => line.itemId === item.id && !line.closedAt && line.source === 'not-enough')),
+                  )
                   const rowTone =
-                    isIssued
+                    isOutOfStockRequestLine
+                      ? 'bg-rose-100/80 hover:!bg-rose-100/90'
+                      : isIssued
                       ? 'bg-sky-100/80'
                       : issueDraft?.mode === 'full'
                       ? 'bg-emerald-50/80'
@@ -899,49 +909,61 @@ export function SeniorWorkspacePage() {
                       <td className={cn(detailTableCell, '!px-1 whitespace-nowrap')} onClick={(event) => event.stopPropagation()}>
                         {requestLine && selectedRequest ? (
                           <div className="flex w-full min-w-0 flex-wrap items-center justify-center gap-1">
-                            <ToolIconButton
-                              label={issueDraft?.mode === 'full' ? 'Отмена' : 'Выдать'}
-                              icon={issueDraft?.mode === 'full' ? undefined : <Check size={13} strokeWidth={2.2} />}
-                              tone={issueDraft?.mode === 'full' ? 'neutral' : 'success'}
-                              className={cn('!min-h-5 !px-1.5 py-0 text-[10px]', issueDraft?.mode === 'full' && 'border-slate-300 bg-white text-slate-700')}
-                              disabled={remaining <= 0 || available < remaining}
-                              onClick={() => stageFullIssue(requestLine.id)}
-                            />
-                            <div className="inline-flex items-center gap-1">
+                            {isOutOfStockRequestLine ? (
                               <ToolIconButton
-                                label={issueDraft?.mode === 'partial' ? 'Отмена' : 'Выдать часть'}
-                                className={cn('!min-h-5 !px-1.5 py-0 text-[10px]', issueDraft?.mode === 'partial' && 'border-slate-300 bg-white text-slate-700')}
-                                disabled={remaining <= 0 || available <= 0}
-                                onClick={() => openPartialIssue(requestLine.id)}
-                              />
-                              {issueDraft?.mode === 'partial' ? (
-                                <input
-                                  type="number"
-                                  min={1}
-                                  max={Math.min(available, remaining)}
-                                  value={partialQuantity}
-                                  onInput={(event) => updatePartialIssue(requestLine.id, event.currentTarget.value)}
-                                  onChange={(event) => updatePartialIssue(requestLine.id, event.target.value)}
-                                  onKeyDown={(event) => {
-                                    if (event.key === 'Enter') {
-                                      updatePartialIssue(requestLine.id, event.currentTarget.value)
-                                      event.currentTarget.blur()
-                                    }
-                                  }}
-                                  className="h-5 w-10 rounded-md border border-amber-300 bg-white px-1 text-center text-[11px] text-slate-900 outline-none focus:border-amber-500"
-                                  aria-label="Количество для частичной выдачи"
-                                />
-                              ) : null}
-                            </div>
-                            {shortage > 0 ? (
-                              <ToolIconButton
-                                label={available <= 0 ? 'Нет на складе / В пополнение' : 'Не хватает / В пополнение'}
+                                label={isLineInReplenishment ? 'В пополнении' : 'Нет на складе / В пополнение'}
                                 icon={<PackageX size={13} strokeWidth={2.2} />}
-                                tone="danger"
+                                tone={isLineInReplenishment ? 'info' : 'danger'}
                                 className="!min-h-5 !px-1.5 py-0 text-[10px]"
-                                onClick={() => markLineOutOfStock(selectedRequest.id, requestLine.id)}
+                                onClick={isLineInReplenishment ? undefined : () => markLineOutOfStock(selectedRequest.id, requestLine.id)}
                               />
-                            ) : null}
+                            ) : (
+                              <>
+                                <ToolIconButton
+                                  label={issueDraft?.mode === 'full' ? 'Отмена' : 'Выдать'}
+                                  icon={issueDraft?.mode === 'full' ? undefined : <Check size={13} strokeWidth={2.2} />}
+                                  tone={issueDraft?.mode === 'full' ? 'neutral' : 'success'}
+                                  className={cn('!min-h-5 !px-1.5 py-0 text-[10px]', issueDraft?.mode === 'full' && 'border-slate-300 bg-white text-slate-700')}
+                                  disabled={remaining <= 0 || available < remaining}
+                                  onClick={() => stageFullIssue(requestLine.id)}
+                                />
+                                <div className="inline-flex items-center gap-1">
+                                  <ToolIconButton
+                                    label={issueDraft?.mode === 'partial' ? 'Отмена' : 'Выдать часть'}
+                                    className={cn('!min-h-5 !px-1.5 py-0 text-[10px]', issueDraft?.mode === 'partial' && 'border-slate-300 bg-white text-slate-700')}
+                                    disabled={remaining <= 0 || available <= 0}
+                                    onClick={() => openPartialIssue(requestLine.id)}
+                                  />
+                                  {issueDraft?.mode === 'partial' ? (
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={Math.min(available, remaining)}
+                                      value={partialQuantity}
+                                      onInput={(event) => updatePartialIssue(requestLine.id, event.currentTarget.value)}
+                                      onChange={(event) => updatePartialIssue(requestLine.id, event.target.value)}
+                                      onKeyDown={(event) => {
+                                        if (event.key === 'Enter') {
+                                          updatePartialIssue(requestLine.id, event.currentTarget.value)
+                                          event.currentTarget.blur()
+                                        }
+                                      }}
+                                      className="h-5 w-10 rounded-md border border-amber-300 bg-white px-1 text-center text-[11px] text-slate-900 outline-none focus:border-amber-500"
+                                      aria-label="Количество для частичной выдачи"
+                                    />
+                                  ) : null}
+                                </div>
+                                {shortage > 0 ? (
+                                  <ToolIconButton
+                                    label="Не хватает / В пополнение"
+                                    icon={<PackageX size={13} strokeWidth={2.2} />}
+                                    tone="danger"
+                                    className="!min-h-5 !px-1.5 py-0 text-[10px]"
+                                    onClick={() => markLineOutOfStock(selectedRequest.id, requestLine.id)}
+                                  />
+                                ) : null}
+                              </>
+                            )}
                           </div>
                         ) : (
                           <div className="grid w-full min-w-0 grid-cols-1 gap-1.5">
