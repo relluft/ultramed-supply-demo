@@ -88,10 +88,6 @@ export function ReceiptPage() {
             .filter((row): row is NonNullable<typeof row> => Boolean(row)),
         )
         .sort((left, right) => {
-          const statusOrder: Record<ReceiptStatusFilter, number> = { waiting: 0, partial: 1, accepted: 2 }
-          const statusCompare = statusOrder[left.receiptStatus] - statusOrder[right.receiptStatus]
-          if (statusCompare) return statusCompare
-
           const supplierCompare = (left.supplier?.name ?? '').localeCompare(right.supplier?.name ?? '', 'ru')
           return supplierCompare || left.order.id.localeCompare(right.order.id, 'ru')
         }),
@@ -581,30 +577,38 @@ export function ReceiptPage() {
                   </tr>,
                   ...group.rows.map((row) => {
                     const rowIndex = receiptRows.findIndex((item) => item.line.id === row.line.id) + 1
+                    const rowCell = (extra?: string) =>
+                      cn(
+                        tableCell,
+                        row.receiptStatus === 'accepted' && 'bg-emerald-50/85 group-hover/receipt-row:bg-emerald-100/75',
+                        row.receiptStatus === 'partial' && 'bg-amber-50/85 group-hover/receipt-row:bg-amber-100/75',
+                        extra,
+                      )
 
                     return (
                       <tr
                         key={row.line.id}
                         className={cn(
+                          'group/receipt-row',
                           rowIndex % 2 ? 'bg-white' : 'bg-slate-50/35',
-                          row.receiptStatus === 'accepted' && 'bg-emerald-50/80 hover:bg-emerald-100/70',
-                          row.receiptStatus === 'partial' && 'bg-amber-50/80 hover:bg-amber-100/70',
+                          row.receiptStatus === 'accepted' && 'bg-emerald-50/80',
+                          row.receiptStatus === 'partial' && 'bg-amber-50/80',
                         )}
                       >
-                        <td className={cn(tableCell, 'text-center font-medium text-slate-950')}>{rowIndex}</td>
-                        <td className={cn(tableCell, 'font-medium text-slate-950')}>{row.order.id}</td>
-                        <td className={tableCell}>{row.source.requestId ?? '-'}</td>
-                        <td className={tableCell}>
+                        <td className={rowCell('text-center font-medium text-slate-950')}>{rowIndex}</td>
+                        <td className={rowCell('font-medium text-slate-950')}>{row.order.id}</td>
+                        <td className={rowCell()}>{row.source.requestId ?? '-'}</td>
+                        <td className={rowCell()}>
                           <div className="break-words text-slate-950">{row.supplier?.name ?? 'Поставщик'}</div>
                         </td>
-                        <td className={tableCell}>
+                        <td className={rowCell()}>
                         <div className="whitespace-normal break-words text-slate-950">{row.item?.fullName ?? 'Позиция'}</div>
                         </td>
-                        <td className={cn(tableCell, 'break-words')}>{row.item?.packageLabel ?? '-'}</td>
-                        <td className={cn(tableCell, 'text-center')}>{row.item?.unit ?? '-'}</td>
-                        <td className={cn(tableCell, 'text-center text-slate-950')}>{formatNumber(row.line.quantity)}</td>
-                        <td className={cn(tableCell, 'text-center')}>{formatNumber(row.alreadyReceived)}</td>
-                        <td className={tableCell}>
+                        <td className={rowCell('break-words')}>{row.item?.packageLabel ?? '-'}</td>
+                        <td className={rowCell('text-center')}>{row.item?.unit ?? '-'}</td>
+                        <td className={rowCell('text-center text-slate-950')}>{formatNumber(row.line.quantity)}</td>
+                        <td className={rowCell('text-center')}>{formatNumber(row.alreadyReceived)}</td>
+                        <td className={rowCell()}>
                           <div className="flex items-center gap-1">
                             <input
                               type="text"
@@ -620,22 +624,22 @@ export function ReceiptPage() {
                             />
                           </div>
                         </td>
-                        <td className={cn(tableCell, 'text-center')}>
+                        <td className={rowCell('text-center')}>
                           <span className={row.shortage > 0 ? 'font-medium text-amber-700' : 'text-slate-500'}>
                             {formatNumber(row.shortage)}
                           </span>
                         </td>
-                        <td className={cn(tableCell, 'text-center text-slate-950')}>{formatNumber(row.newStock)}</td>
-                        <td className={tableCell}>
+                        <td className={rowCell('text-center text-slate-950')}>{formatNumber(row.newStock)}</td>
+                        <td className={rowCell()}>
                         <StatusPill className="px-1.5 text-[10px]" tone={row.receiptStatus === 'accepted' ? 'success' : row.receiptStatus === 'partial' ? 'warning' : statusTone(row.order.status)}>
                             {row.receiptStatus === 'accepted'
                               ? 'Принято'
                               : row.receiptStatus === 'partial'
                                 ? 'Частично принято'
-                                : 'Ожидает прихода'}
+                              : 'Ожидает прихода'}
                           </StatusPill>
                         </td>
-                        <td className={tableCell}>
+                        <td className={rowCell()}>
                           <input
                             value={row.line.receiptComment ?? ''}
                             onChange={(event) => updateReceiptLineComment(row.order.id, row.line.id, event.target.value)}
@@ -643,7 +647,7 @@ export function ReceiptPage() {
                             className="h-7 w-full rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
                           />
                         </td>
-                        <td className={cn(tableCell, 'text-center')}>
+                        <td className={rowCell('text-center')}>
                           {pendingAccept?.type === 'line' && pendingAccept.id === row.line.id ? (
                             <div className="mx-auto inline-flex h-7 overflow-hidden rounded-md border border-emerald-300 bg-white text-[10px] shadow-sm">
                               <button
