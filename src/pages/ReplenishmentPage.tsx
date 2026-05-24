@@ -1,10 +1,10 @@
-import { ArrowRight, Check, ChevronDown, ClipboardCheck, Download, FileSpreadsheet, Loader2, Mail, PackagePlus, Reply } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, Download, FileSpreadsheet, Loader2, PackagePlus } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { BrandedLoadingModal } from '../components/BrandedLoadingModal'
 import { PageTransition } from '../components/PageTransition'
-import { EmptyState, Panel, SectionHeader, StatusPill } from '../components/ui'
+import { EmptyState, Panel, StatusPill } from '../components/ui'
 import { useDemo } from '../context'
 import {
   clinicBackupSupplierId,
@@ -18,11 +18,8 @@ const headerCell =
 const tableCell = 'border-b border-r border-slate-100 px-2 py-1 align-middle text-[11px] leading-3 text-slate-700 last:border-r-0'
 const supplierBadgeClass =
   'inline-flex shrink-0 items-center rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-normal uppercase tracking-wide text-emerald-800'
-const inquiryStepClass =
-  'app-soft-card flex min-w-[160px] flex-1 items-center gap-2 rounded-md border px-2.5 py-2 text-xs text-[#587367]'
 const replenishmentSupplierIds = [clinicMainSupplierId, clinicBackupSupplierId]
 const replenishmentDisplayLimit = 20
-const vatRate = 0.2
 
 function ModalPortal({ children }: { children: ReactNode }) {
   if (typeof document === 'undefined') return null
@@ -96,7 +93,6 @@ export function ReplenishmentPage() {
     toggleReplenishmentInOrder,
     formSupplierOrders,
   } = useDemo()
-  const clinicMainSupplier = suppliers.find((supplier) => supplier.id === clinicMainSupplierId)
   const room105RequestIds = useMemo(
     () => new Set(requests.filter((request) => request.roomId === 'room-105').map((request) => request.id)),
     [requests],
@@ -384,7 +380,6 @@ export function ReplenishmentPage() {
           currentStock: line.currentStock,
           minStock: line.minStock,
           priceWithVat,
-          vat: priceWithVat ? priceWithVat - priceWithVat / (1 + vatRate) : 0,
           totalWithVat: priceWithVat * quantity,
         }
       })
@@ -403,7 +398,6 @@ export function ReplenishmentPage() {
             <td>${escapeHtml(row.packageLabel)}</td>
             <td>${escapeHtml(row.reason)}</td>
             <td>${escapeHtml(row.priceWithVat)}</td>
-            <td>${escapeHtml(row.vat)}</td>
             <td>${escapeHtml(row.totalWithVat)}</td>
             <td>${escapeHtml(row.currentStock)}</td>
             <td>${escapeHtml(row.minStock)}</td>
@@ -441,7 +435,6 @@ export function ReplenishmentPage() {
                 <th>Упаковка</th>
                 <th>Причина</th>
                 <th>Цена с НДС</th>
-                <th>НДС за ед.</th>
                 <th>Сумма с НДС</th>
                 <th>Остаток</th>
                 <th>Мин.</th>
@@ -502,51 +495,51 @@ export function ReplenishmentPage() {
   }
 
   return (
-    <PageTransition className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4">
-      <Panel>
-        <SectionHeader
-          title="Пополнение"
-          subtitle={
-            selectedOperation
+    <PageTransition className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2">
+      <Panel className="p-3">
+        <div>
+          <h1 className="text-xl font-normal leading-6 text-slate-950">Пополнение</h1>
+          <p className="mt-1 max-w-3xl text-sm leading-5 text-slate-600">
+            {selectedOperation
               ? `${selectedOperation.sourceLabel}: ${selectedOperation.subtitle}`
-              : 'Активных позиций ниже минимума или без остатка пока нет.'
-          }
-        />
+              : 'Активных позиций ниже минимума или без остатка пока нет.'}
+          </p>
+        </div>
         {selectedOperation ? (
-          <div className="mt-4 grid gap-2 md:grid-cols-2">
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
             <button
               type="button"
               onClick={() => setWorkflowStage('inquiry')}
               className={cn(
-                'rounded-md border px-4 py-3 text-left transition',
+                'rounded-md border px-3 py-2 text-left transition',
                 workflowStage === 'inquiry'
                   ? 'border-emerald-300 bg-emerald-50 text-emerald-950 shadow-sm'
                   : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
               )}
             >
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-normal uppercase tracking-wide">1. Проверка наличия</span>
                 <StatusPill tone={waitingResponseCount ? 'warning' : inquiryNeededCount ? 'info' : 'success'}>
                   {inquiryNeededCount ? `${inquiryNeededCount} не проверено` : waitingResponseCount ? `${waitingResponseCount} ждут` : 'готово'}
                 </StatusPill>
               </div>
-              <div className="mt-1 text-sm text-slate-500">Подготовить Excel-запрос, отправить поставщику вручную и внести ответ.</div>
+              <div className="mt-0.5 text-xs leading-4 text-slate-500">Подготовить Excel-запрос, отправить поставщику вручную и внести ответ.</div>
             </button>
             <button
               type="button"
               onClick={() => setWorkflowStage('order')}
               className={cn(
-                'rounded-md border px-4 py-3 text-left transition',
+                'rounded-md border px-3 py-2 text-left transition',
                 workflowStage === 'order'
                   ? 'border-emerald-300 bg-emerald-50 text-emerald-950 shadow-sm'
                   : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
               )}
             >
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-normal uppercase tracking-wide">2. Формирование заказа</span>
                 <StatusPill tone={readyCount ? 'success' : 'neutral'}>{readyCount ? `${readyCount} подтверждено` : 'нет строк'}</StatusPill>
               </div>
-              <div className="mt-1 text-sm text-slate-500">В заказ попадают только позиции с подтвержденным наличием.</div>
+              <div className="mt-0.5 text-xs leading-4 text-slate-500">В заказ попадают только позиции с подтвержденным наличием.</div>
             </button>
           </div>
         ) : null}
@@ -626,19 +619,18 @@ export function ReplenishmentPage() {
       <Panel className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] overflow-hidden p-0">
         {tableLines.length ? (
           <div className="h-full overflow-auto">
-            <table className="w-full min-w-[1580px] border-separate border-spacing-0">
+            <table className="w-full min-w-[1460px] border-separate border-spacing-0">
               <colgroup>
                 <col className="w-[3%]" />
-                <col className="w-[24%]" />
+                <col className="w-[29%]" />
                 <col className="w-[4%]" />
                 <col className="w-[4%]" />
+                <col className="w-[11%]" />
+                <col className="w-[9%]" />
                 <col className="w-[10%]" />
-                <col className="w-[8%]" />
-                <col className="w-[7%]" />
-                <col className="w-[8%]" />
-                <col className="w-[16%]" />
-                <col className="w-[7%]" />
-                <col className="w-[5%]" />
+                <col className="w-[11%]" />
+                <col className="w-[13%]" />
+                <col className="w-[6%]" />
               </colgroup>
               <thead>
                 <tr>
@@ -648,7 +640,6 @@ export function ReplenishmentPage() {
                   <th className={headerCell}>Мин.</th>
                   <th className={headerCell}>Закупка</th>
                   <th className={headerCell}>Цена с НДС</th>
-                  <th className={headerCell}>НДС за ед.</th>
                   <th className={headerCell}>Сумма с НДС</th>
                   <th className={headerCell}>Поставщик</th>
                   <th className={headerCell}>Наличие</th>
@@ -671,7 +662,6 @@ export function ReplenishmentPage() {
                     ? line.recommendedQuantity
                     : Math.max(line.desiredStock - line.currentStock, line.minStock - line.currentStock, 1)
                   const priceWithVat = fallbackPriceWithVat(item)
-                  const vatPerUnit = priceWithVat ? priceWithVat - priceWithVat / (1 + vatRate) : 0
                   const totalWithVat = priceWithVat * purchaseQuantity
 
                   return (
@@ -686,7 +676,7 @@ export function ReplenishmentPage() {
                     >
                       <td className={cn(tableCell, 'text-center text-xs text-slate-500')}>{index + 1}</td>
                       <td className={tableCell}>
-                        <div className="whitespace-normal break-words text-slate-950">{item?.fullName ?? 'Позиция'}</div>
+                        <div className="whitespace-normal break-words text-[17px] leading-[22px] text-slate-950">{item?.fullName ?? 'Позиция'}</div>
                         <div className="mt-0.5 text-[10px] leading-3 text-slate-500">
                           {item?.category}
                         </div>
@@ -724,7 +714,6 @@ export function ReplenishmentPage() {
                         </div>
                       </td>
                       <td className={cn(tableCell, 'whitespace-nowrap text-right')}>{priceWithVat ? formatMoney(priceWithVat) : '-'}</td>
-                      <td className={cn(tableCell, 'whitespace-nowrap text-right')}>{vatPerUnit ? formatMoney(vatPerUnit) : '-'}</td>
                       <td className={cn(tableCell, 'whitespace-nowrap text-right text-slate-950')}>{totalWithVat ? formatMoney(totalWithVat) : '-'}</td>
                       <td
                         className={cn(
@@ -738,10 +727,10 @@ export function ReplenishmentPage() {
                           <button
                             type="button"
                             onClick={() => setOpenSupplierLineId((current) => (current === line.id ? null : line.id))}
-                            className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md border border-slate-200 bg-white px-2 text-left text-xs text-slate-900 outline-none transition hover:border-slate-300 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
+                            className="flex h-7 w-full min-w-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-1.5 text-left text-xs text-slate-900 outline-none transition hover:border-slate-300 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
                             title={supplierName(selectedSupplierId)}
                           >
-                            <span className="min-w-0 flex-1 truncate">{supplierName(selectedSupplierId)}</span>
+                            <span className="min-w-0 truncate">{supplierName(selectedSupplierId)}</span>
                             {selectedMainSupplier ? <span className={supplierBadgeClass}>основной</span> : null}
                             <ChevronDown size={13} className="shrink-0 text-slate-400" />
                           </button>
@@ -763,12 +752,12 @@ export function ReplenishmentPage() {
                                   type="button"
                                   onClick={() => changeSupplier(line.id, supplierId)}
                                   className={cn(
-                                    'flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs transition',
+                                    'flex w-full items-center gap-1 px-2 py-1.5 text-left text-xs transition',
                                     selected ? 'bg-slate-100 text-slate-950' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-950',
                                   )}
                                   title={supplierName(supplierId)}
                                 >
-                                  <span className="min-w-0 flex-1 truncate">{supplierName(supplierId)}</span>
+                                  <span className="min-w-0 truncate">{supplierName(supplierId)}</span>
                                   {mainSupplier ? <span className={supplierBadgeClass}>основной</span> : null}
                                 </button>
                               )
@@ -864,35 +853,6 @@ export function ReplenishmentPage() {
         )}
         {workflowStage === 'inquiry' ? (
         <div className="shrink-0 border-t border-slate-200 bg-white">
-          <div className="app-section-band grid gap-2 border-b border-slate-100 px-3 py-2 xl:grid-cols-[240px_minmax(0,1fr)]">
-            <div className="min-w-0">
-              <div className="text-xs font-normal uppercase tracking-wide text-slate-500">Контур запроса наличия</div>
-              <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-slate-600">
-                <span>Основной поставщик:</span>
-                <span className="truncate text-slate-950">{clinicMainSupplier?.name ?? supplierName(clinicMainSupplierId)}</span>
-                <span className={supplierBadgeClass}>основной</span>
-              </div>
-            </div>
-            <div className="grid gap-1.5 md:grid-cols-2 xl:grid-cols-4">
-              <div className={inquiryStepClass}>
-                <FileSpreadsheet size={15} className="shrink-0 text-emerald-700" />
-                <span className="min-w-0">1. Excel-запрос по поставщикам</span>
-              </div>
-              <div className={inquiryStepClass}>
-                <Mail size={15} className="shrink-0 text-sky-700" />
-                <span className="min-w-0">2. Ручная отправка менеджеру</span>
-              </div>
-              <div className={inquiryStepClass}>
-                <Reply size={15} className="shrink-0 text-amber-700" />
-                <span className="min-w-0">3. Ответ: есть / нет</span>
-              </div>
-              <div className={inquiryStepClass}>
-                <ClipboardCheck size={15} className="shrink-0 text-emerald-700" />
-                <span className="min-w-0">4. Заказ только подтвержденного</span>
-              </div>
-            </div>
-          </div>
-
           <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               {supplierInquiryGroups.length ? (
