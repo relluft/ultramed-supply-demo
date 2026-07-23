@@ -1,8 +1,10 @@
 import {
   BookOpen,
   ArrowLeft,
+  CalendarDays,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   ClipboardList,
   ListFilter,
@@ -15,6 +17,7 @@ import {
   ShoppingCart,
   Truck,
 } from 'lucide-react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { BrandedLoadingModal } from '../components/BrandedLoadingModal'
@@ -30,22 +33,40 @@ import {
   stockStatusLabels,
 } from '../lib/demoLogic'
 import { cn, formatDateTime, formatNumber } from '../lib/format'
-import type { CatalogItem, SupplyRequestLine } from '../types/demo'
+import type { CatalogItem, RequestStatus, SupplyRequestLine } from '../types/demo'
 
 const allCategory = 'Все разделы'
 const manualCategory = 'Ручные позиции'
 const compactHeaderCell =
   'sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-3 py-2 text-left text-[11px] font-normal uppercase tracking-wide text-slate-500'
 const compactTableCell = 'border-b border-slate-100 px-3 py-1 align-middle text-sm leading-5 text-slate-700'
-const overviewHeaderCell = cn(compactHeaderCell, 'border-r border-slate-200 last:border-r-0')
-const overviewTableCell = cn(compactTableCell, 'border-r border-slate-100 last:border-r-0')
+const overviewHeaderCell = cn(
+  compactHeaderCell,
+  '!border-b-2 !border-b-[#66c99d] !border-r-[#8fddbf] !bg-[#c9f8e8] !px-1.5 !py-2.5 !text-[13px] !font-bold !leading-[1.25] !tracking-[0.04em] !text-[#17362d] [font-family:Manrope,var(--font-sans)] shadow-[inset_0_1px_0_rgba(255,255,255,0.78),inset_0_-1px_0_rgba(38,138,104,0.14)] last:!border-r-0',
+)
+const overviewHeaderLabel = 'flex min-h-[30px] items-center justify-center text-center'
+const overviewTableCell = cn(compactTableCell, '!px-1.5 !text-[13px] border-r border-slate-100 last:border-r-0')
 const detailHeaderCell = cn(compactHeaderCell, 'border-r border-slate-200 !text-center last:border-r-0')
 const detailTableCell = cn(compactTableCell, 'border-r border-slate-100 last:border-r-0')
+const overviewFilterControl =
+  'h-9 rounded-md border border-slate-200 bg-white px-3 text-sm font-normal text-slate-700 outline-none transition hover:border-slate-300 hover:bg-slate-50 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-700/10'
+const allOverviewFilter = 'all'
+type OverviewDatePreset = 'all' | 'latest-week' | 'latest-month' | 'latest-year' | 'custom'
 
 type IssueDraft =
   | { mode: 'full' }
   | { mode: 'partial'; quantity: string }
 type IssueConfirmationStatus = 'idle' | 'loading' | 'done'
+const requestPaneEase = [0.22, 1, 0.36, 1] as const
+const compactRequestPaneWidth = 224
+const requestMorphDurationMs = 360
+
+function overviewRequestStatusRank(status: RequestStatus) {
+  if (status === 'partially-issued') return 0
+  if (status === 'sent') return 1
+  if (status === 'issued') return 3
+  return 2
+}
 
 const seniorDashboardGroups = [
   {
@@ -87,6 +108,125 @@ function matchesManualLineQuery(line: SupplyRequestLine, query: string) {
   if (!value) return true
 
   return [line.manualName, line.comment, line.seniorComment].filter(Boolean).join(' ').toLowerCase().includes(value)
+}
+
+function formatPersonInitials(name?: string) {
+  const parts = name?.trim().split(/\s+/).filter(Boolean) ?? []
+  if (!parts.length) return '—'
+
+  if (parts.length >= 3) {
+    const [firstName, middleName] = parts
+    const lastName = parts[parts.length - 1]
+    return `${lastName} ${firstName.charAt(0)}.${middleName.charAt(0)}.`
+  }
+
+  if (parts.length === 2) {
+    const [firstName, lastName] = parts
+    return `${lastName} ${firstName.charAt(0)}.`
+  }
+
+  return parts[0]
+}
+
+function formatRequestDateLabel(value: string) {
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date(value)).replace(/\.$/, '')
+}
+
+function formatRequestTimeLabel(value: string) {
+  return new Intl.DateTimeFormat('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
+function overviewStatusBadgeClass(tone: ReturnType<typeof statusTone>) {
+  const classes = {
+    neutral: 'bg-slate-100 text-slate-600',
+    success: 'bg-green-100 text-green-700',
+    warning: 'bg-amber-100 text-amber-700',
+    danger: 'bg-rose-100 text-rose-700',
+    info: 'bg-sky-100 text-sky-700',
+  }[tone]
+
+  return cn('inline-flex min-h-6 items-center justify-center rounded-md px-2.5 text-xs font-normal', classes)
+}
+
+function overviewStatusRailClass(tone: ReturnType<typeof statusTone>) {
+  return {
+    neutral: 'overview-request-rail--neutral',
+    success: 'overview-request-rail--success',
+    warning: 'overview-request-rail--warning',
+    danger: 'overview-request-rail--danger',
+    info: 'overview-request-rail--info',
+  }[tone]
+}
+
+function overviewStatusHoverClass(tone: ReturnType<typeof statusTone>) {
+  return {
+    neutral: 'hover:bg-slate-50/80',
+    success: 'hover:bg-green-50/70',
+    warning: 'hover:bg-amber-50/70',
+    danger: 'hover:bg-rose-50/70',
+    info: 'hover:bg-sky-50/70',
+  }[tone]
+}
+
+function startOfDay(date: Date) {
+  const next = new Date(date)
+  next.setHours(0, 0, 0, 0)
+  return next
+}
+
+function endOfDay(date: Date) {
+  const next = new Date(date)
+  next.setHours(23, 59, 59, 999)
+  return next
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+function addMonths(date: Date, months: number) {
+  const next = new Date(date)
+  next.setMonth(next.getMonth() + months)
+  return next
+}
+
+function addYears(date: Date, years: number) {
+  const next = new Date(date)
+  next.setFullYear(next.getFullYear() + years)
+  return next
+}
+
+function dateInputValue(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function parseDateInput(value: string, boundary: 'start' | 'end') {
+  if (!value) return null
+
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return null
+
+  const date = new Date(year, month - 1, day)
+  return boundary === 'start' ? startOfDay(date) : endOfDay(date)
+}
+
+function overviewDateLabel(preset: OverviewDatePreset) {
+  if (preset === 'latest-week') return 'За неделю'
+  if (preset === 'latest-month') return 'За месяц'
+  if (preset === 'latest-year') return 'За год'
+  if (preset === 'custom') return 'Свой период'
+  return 'Все даты'
 }
 
 function SidebarButton({
@@ -155,7 +295,13 @@ function ToolIconButton({
 
 export function SeniorWorkspacePage() {
   const location = useLocation()
+  const shouldReduceMotion = useReducedMotion()
   const issueFinishTimerRef = useRef<number | null>(null)
+  const overviewDateMenuRef = useRef<HTMLDivElement | null>(null)
+  const requestWorkspaceRef = useRef<HTMLElement | null>(null)
+  const requestWorkspaceHeaderRef = useRef<HTMLDivElement | null>(null)
+  const compactRequestListRef = useRef<HTMLDivElement | null>(null)
+  const selectedCompactRequestRef = useRef<HTMLButtonElement | null>(null)
   const {
     state: { rooms, catalog, stock, requests, replenishment, activeRequestId },
     setActiveRequest,
@@ -170,44 +316,115 @@ export function SeniorWorkspacePage() {
   const [issueDrafts, setIssueDrafts] = useState<Record<string, IssueDraft>>({})
   const [issueConfirmationStatus, setIssueConfirmationStatus] = useState<IssueConfirmationStatus>('idle')
   const [openedRequestId, setOpenedRequestId] = useState<string | null>(null)
-  const [overviewFiltersOpen, setOverviewFiltersOpen] = useState(false)
   const [overviewQuery, setOverviewQuery] = useState('')
+  const [overviewStatusFilter, setOverviewStatusFilter] = useState<RequestStatus | typeof allOverviewFilter>(allOverviewFilter)
+  const [overviewRoomFilter, setOverviewRoomFilter] = useState(allOverviewFilter)
+  const [overviewDatePreset, setOverviewDatePreset] = useState<OverviewDatePreset>('all')
+  const [overviewDateMenuOpen, setOverviewDateMenuOpen] = useState(false)
+  const [overviewCustomStartDate, setOverviewCustomStartDate] = useState('')
+  const [overviewCustomEndDate, setOverviewCustomEndDate] = useState('')
+  const [requestWorkspaceWidth, setRequestWorkspaceWidth] = useState(0)
+  const [requestOverviewHeaderHeight, setRequestOverviewHeaderHeight] = useState(0)
   const isRequestsMode = location.hash === '#requests'
   const isRequestOverview = isRequestsMode && !openedRequestId
+  const requestPaneTransition = shouldReduceMotion
+    ? { duration: 0 }
+    : { duration: requestMorphDurationMs / 1000, ease: requestPaneEase }
+  const requestContentTransition = shouldReduceMotion
+    ? { duration: 0 }
+    : { duration: 0.18, ease: requestPaneEase }
 
   const sortedRequests = useMemo(
-    () => [...requests].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    () =>
+      [...requests].sort((a, b) => {
+        const statusRank = overviewRequestStatusRank(a.status) - overviewRequestStatusRank(b.status)
+        if (statusRank !== 0) return statusRank
+
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      }),
     [requests],
   )
+  const requestNumberById = useMemo(() => {
+    const requestsByCreatedAt = [...requests].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    return new Map(requestsByCreatedAt.map((request, index) => [request.id, index + 1]))
+  }, [requests])
+  const overviewStatusOptions = useMemo(
+    () => Array.from(new Set(sortedRequests.map((request) => request.status))),
+    [sortedRequests],
+  )
+  const overviewRoomOptions = useMemo(() => {
+    const requestRoomIds = new Set(sortedRequests.map((request) => request.roomId))
+    return rooms.filter((room) => requestRoomIds.has(room.id))
+  }, [rooms, sortedRequests])
+  const overviewDateBounds = useMemo(() => {
+    if (!sortedRequests.length) return null
+
+    const dates = sortedRequests.map((request) => new Date(request.createdAt).getTime())
+    return {
+      start: startOfDay(new Date(Math.min(...dates))),
+      end: endOfDay(new Date(Math.max(...dates))),
+      latest: new Date(Math.max(...dates)),
+    }
+  }, [sortedRequests])
+  const overviewCustomStartValue = overviewCustomStartDate || (overviewDateBounds ? dateInputValue(overviewDateBounds.start) : '')
+  const overviewCustomEndValue = overviewCustomEndDate || (overviewDateBounds ? dateInputValue(overviewDateBounds.end) : '')
+  const overviewDateRange = useMemo(() => {
+    if (!overviewDateBounds || overviewDatePreset === 'all') return null
+
+    const latest = overviewDateBounds.latest
+    if (overviewDatePreset === 'latest-week') {
+      return { start: startOfDay(addDays(latest, -6)), end: endOfDay(latest) }
+    }
+
+    if (overviewDatePreset === 'latest-month') {
+      return { start: startOfDay(addMonths(latest, -1)), end: endOfDay(latest) }
+    }
+
+    if (overviewDatePreset === 'latest-year') {
+      return { start: startOfDay(addYears(latest, -1)), end: endOfDay(latest) }
+    }
+
+    const start = parseDateInput(overviewCustomStartValue, 'start')
+    const end = parseDateInput(overviewCustomEndValue, 'end')
+
+    if (start && end) {
+      return start.getTime() <= end.getTime() ? { start, end } : { start: end, end: start }
+    }
+
+    if (start) return { start, end: endOfDay(overviewDateBounds.latest) }
+    if (end) return { start: overviewDateBounds.start, end }
+
+    return null
+  }, [overviewCustomEndValue, overviewCustomStartValue, overviewDateBounds, overviewDatePreset])
+  const overviewFiltersActive =
+    Boolean(overviewQuery.trim()) ||
+    overviewStatusFilter !== allOverviewFilter ||
+    overviewRoomFilter !== allOverviewFilter ||
+    overviewDatePreset !== 'all'
   const visibleRequests = useMemo(() => {
-    const value = overviewQuery.trim().toLowerCase()
-    if (!value) return sortedRequests
+    const titleValue = overviewQuery.trim().toLowerCase()
 
     return sortedRequests.filter((request) => {
-      const room = rooms.find((item) => item.id === request.roomId)
-      const lineLabels = request.lines.map((line) => {
-        const item = line.itemId ? catalog.find((candidate) => candidate.id === line.itemId) : undefined
-        return [item?.fullName, item?.shortName, item?.category, line.manualName].filter(Boolean).join(' ')
-      })
-      const haystack = [
-        request.id,
-        request.title,
-        request.comment,
-        request.createdBy,
-        room?.number,
-        room?.title,
-        room?.type,
-        ...lineLabels,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
+      if (overviewStatusFilter !== allOverviewFilter && request.status !== overviewStatusFilter) return false
+      if (overviewRoomFilter !== allOverviewFilter && request.roomId !== overviewRoomFilter) return false
 
-      return haystack.includes(value)
+      if (overviewDateRange) {
+        const createdAt = new Date(request.createdAt).getTime()
+        if (createdAt < overviewDateRange.start.getTime() || createdAt > overviewDateRange.end.getTime()) return false
+      }
+
+      if (titleValue && !requestTitle(request).toLowerCase().includes(titleValue)) return false
+
+      return true
     })
-  }, [catalog, overviewQuery, rooms, sortedRequests])
+  }, [overviewDateRange, overviewQuery, overviewRoomFilter, overviewStatusFilter, sortedRequests])
   const openedRequest = openedRequestId ? sortedRequests.find((request) => request.id === openedRequestId) : undefined
   const selectedRequest = openedRequest ?? sortedRequests.find((request) => request.id === activeRequestId) ?? sortedRequests[0]
+  const compactRequests = isRequestsMode && openedRequest
+    ? visibleRequests.some((request) => request.id === openedRequest.id)
+      ? visibleRequests
+      : [openedRequest, ...visibleRequests]
+    : sortedRequests
 
   const activeCatalog = useMemo(() => catalog.filter((item) => item.active), [catalog])
   const requestCatalog = useMemo(() => {
@@ -288,8 +505,73 @@ export function SeniorWorkspacePage() {
   }, [])
 
   useEffect(() => {
+    if (!overviewDateMenuOpen) return
+
+    function handlePointerDown(event: MouseEvent) {
+      if (overviewDateMenuRef.current?.contains(event.target as Node)) return
+      setOverviewDateMenuOpen(false)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [overviewDateMenuOpen])
+
+  useEffect(() => {
     setIssueDrafts({})
   }, [selectedRequest?.id])
+
+  useEffect(() => {
+    if (!isRequestsMode || !requestWorkspaceRef.current) return
+
+    const workspace = requestWorkspaceRef.current
+    const updateWidth = () => setRequestWorkspaceWidth(workspace.clientWidth)
+    updateWidth()
+
+    const observer = new ResizeObserver(updateWidth)
+    observer.observe(workspace)
+    return () => observer.disconnect()
+  }, [isRequestsMode])
+
+  useEffect(() => {
+    if (!isRequestOverview || !requestWorkspaceHeaderRef.current) return
+
+    const header = requestWorkspaceHeaderRef.current
+    const updateHeight = () => setRequestOverviewHeaderHeight(header.offsetHeight)
+    updateHeight()
+
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(header)
+    return () => observer.disconnect()
+  }, [isRequestOverview])
+
+  useEffect(() => {
+    if (!isRequestsMode || !openedRequestId) return
+
+    const timer = window.setTimeout(() => {
+      const container = compactRequestListRef.current
+      const selected = selectedCompactRequestRef.current
+      if (!container || !selected) return
+
+      const containerRect = container.getBoundingClientRect()
+      const selectedRect = selected.getBoundingClientRect()
+      const topOverflow = selectedRect.top - containerRect.top
+      const bottomOverflow = selectedRect.bottom - containerRect.bottom
+
+      if (topOverflow < 0) {
+        container.scrollTo({
+          top: Math.max(0, container.scrollTop + topOverflow - 4),
+          behavior: shouldReduceMotion ? 'auto' : 'smooth',
+        })
+      } else if (bottomOverflow > 0) {
+        container.scrollTo({
+          top: container.scrollTop + bottomOverflow + 4,
+          behavior: shouldReduceMotion ? 'auto' : 'smooth',
+        })
+      }
+    }, shouldReduceMotion ? 0 : requestMorphDurationMs)
+
+    return () => window.clearTimeout(timer)
+  }, [isRequestsMode, openedRequestId, selectedRequest?.id, shouldReduceMotion])
 
   useEffect(() => {
     if (isRequestsMode) {
@@ -434,10 +716,27 @@ export function SeniorWorkspacePage() {
   }
 
   function openRequest(requestId: string) {
+    if (isRequestsMode) {
+      const workspaceWidth = requestWorkspaceRef.current?.clientWidth
+      const headerHeight = requestWorkspaceHeaderRef.current?.offsetHeight
+      if (workspaceWidth) setRequestWorkspaceWidth(workspaceWidth)
+      if (headerHeight) setRequestOverviewHeaderHeight(headerHeight)
+    }
+
     setOpenedRequestId(requestId)
     setActiveRequest(requestId)
     setSelectedCategory(allCategory)
     setQuery('')
+  }
+
+  function resetOverviewFilters() {
+    setOverviewQuery('')
+    setOverviewStatusFilter(allOverviewFilter)
+    setOverviewRoomFilter(allOverviewFilter)
+    setOverviewDatePreset('all')
+    setOverviewDateMenuOpen(false)
+    setOverviewCustomStartDate('')
+    setOverviewCustomEndDate('')
   }
 
   function getRequestStats(request: typeof sortedRequests[number]) {
@@ -458,33 +757,33 @@ export function SeniorWorkspacePage() {
   function renderRequestContext() {
     if (!selectedRequest) return null
 
-    const creatorName = selectedRequestRoom?.nurseName || selectedRequest.createdBy
+    const creatorName = selectedRequest.createdBy
 
     return (
-      <div className="app-soft-card grid min-w-0 gap-3 rounded-md border px-3 py-2 text-xs text-slate-500 xl:grid-cols-[0.9fr_1.25fr_0.85fr_1.8fr]">
+      <div className="app-soft-card grid min-w-0 gap-x-3 gap-y-2 rounded-md border px-3 py-2 text-xs text-slate-500 xl:grid-cols-[120px_215px_105px_minmax(0,1fr)]">
         <div className="min-w-0 border-r border-slate-200 pr-3">
           <div className="mb-1 text-[11px] font-semibold uppercase text-slate-400">Кабинет</div>
-          <div className="text-sm font-semibold text-slate-950">{requestCabinetLabel(selectedRequest)}</div>
-          <div className="mt-0.5 truncate">{selectedRequestRoom?.type ?? 'кабинет'}</div>
+          <div className="text-sm font-semibold leading-5 text-slate-950">{requestCabinetLabel(selectedRequest)}</div>
+          <div className="mt-0.5 leading-4">{selectedRequestRoom?.type ?? 'кабинет'}</div>
         </div>
         <div className="min-w-0 border-r border-slate-200 pr-3">
           <div className="mb-1 text-[11px] font-semibold uppercase text-slate-400">Запрос создан</div>
-          <div className="whitespace-nowrap text-sm font-semibold text-slate-950">{creatorName}</div>
-          <div className="mt-0.5 truncate">медсестра</div>
+          <div className="break-words text-sm font-semibold leading-5 text-slate-950">{creatorName}</div>
+          <div className="mt-0.5 leading-4">медсестра</div>
         </div>
         <div className="min-w-0 border-r border-slate-200 pr-3">
           <div className="mb-1 text-[11px] font-semibold uppercase text-slate-400">Подана</div>
-          <div className="text-sm font-semibold text-slate-950">
+          <div className="text-sm font-semibold leading-5 text-slate-950">
             {formatDateTime(selectedRequest.createdAt)}
           </div>
-          <div className="mt-0.5 truncate">подана заявка</div>
+          <div className="mt-0.5 leading-4">подана заявка</div>
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 xl:col-span-4 xl:border-t xl:border-slate-200 xl:pt-2 min-[1700px]:!col-span-1 min-[1700px]:!border-t-0 min-[1700px]:!pt-0">
           <div className="mb-1 text-[11px] font-semibold uppercase text-slate-400">Комментарий</div>
-          <div className="truncate text-sm font-semibold text-slate-950">
+          <div className="whitespace-normal break-words text-sm font-semibold leading-5 text-slate-950">
             {requestTitle(selectedRequest)}
           </div>
-          <div className="mt-0.5 line-clamp-2 leading-4">
+          <div className="mt-1 whitespace-normal break-words text-sm leading-5 text-slate-800">
             {selectedRequest.comment || 'Комментарий не указан'}
           </div>
         </div>
@@ -494,54 +793,102 @@ export function SeniorWorkspacePage() {
 
   function renderRequestsOverview() {
     return (
-      <div className="app-section-band min-h-0 flex-1 overflow-auto p-3">
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="app-section-band flex min-h-0 flex-1 flex-col p-3">
+        <div className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-lg border border-slate-200 bg-white shadow-sm">
           <table className="w-full table-fixed border-separate border-spacing-0">
             <thead>
               <tr>
-                <th className={cn(overviewHeaderCell, 'w-[94px]')}>
-                  <div className="flex justify-center">Дата</div>
+                <th className={cn(overviewHeaderCell, 'w-[36px]')}>
+                  <div className={overviewHeaderLabel}>№</div>
                 </th>
-                <th className={cn(overviewHeaderCell, 'w-[150px]')}>
-                  <div className="flex justify-center">Кабинет</div>
+                <th className={cn(overviewHeaderCell, 'w-[92px]')}>
+                  <div className={overviewHeaderLabel}>Дата и время</div>
                 </th>
-                <th className={cn(overviewHeaderCell, 'w-[360px]')}>
-                  <div className="flex justify-center">Наименование заявки</div>
+                <th className={cn(overviewHeaderCell, 'w-[90px]')}>
+                  <div className={overviewHeaderLabel}>Кабинет</div>
                 </th>
-                <th className={cn(overviewHeaderCell, 'w-[112px]')}>
-                  <div className="flex justify-center">Статус</div>
+                <th className={cn(overviewHeaderCell, 'w-[260px]')}>
+                  <div className={overviewHeaderLabel}>Наименование заявки</div>
                 </th>
-                <th className={cn(overviewHeaderCell, 'w-[86px]')}>
-                  <div className="flex justify-center">Позиций</div>
+                <th className={cn(overviewHeaderCell, 'w-[88px]')}>
+                  <div className={overviewHeaderLabel}>Статус</div>
                 </th>
-                <th className={cn(overviewHeaderCell, 'w-[700px]')}>
-                  <div className="flex justify-center">Комментарий</div>
+                <th className={cn(overviewHeaderCell, 'w-[50px]')}>
+                  <div className={overviewHeaderLabel}>Поз.</div>
+                </th>
+                <th className={cn(overviewHeaderCell, 'w-[122px]')}>
+                  <div className={overviewHeaderLabel}>Автор</div>
+                </th>
+                <th className={cn(overviewHeaderCell, 'w-[262px]')}>
+                  <div className={overviewHeaderLabel}>Комментарий</div>
                 </th>
               </tr>
             </thead>
             <tbody>
               {visibleRequests.map((request) => {
+                const requestNumber = requestNumberById.get(request.id) ?? '—'
+                const authorName = formatPersonInitials(request.createdBy)
+                const requestTone = statusTone(request.status)
+
                 return (
                   <tr
                     key={request.id}
+                    data-testid={`request-row-${request.id}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${requestCabinetLabel(request)}, ${formatDateTime(request.createdAt)}, ${request.lines.length} позиций, статус: ${requestStatusLabel(request)}`}
                     onClick={() => openRequest(request.id)}
-                    className="cursor-pointer transition hover:bg-emerald-50/60"
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return
+                      event.preventDefault()
+                      openRequest(request.id)
+                    }}
+                    className={cn(
+                      'cursor-pointer transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600/40',
+                      overviewStatusHoverClass(requestTone),
+                    )}
                   >
-                    <td className={cn(overviewTableCell, 'whitespace-nowrap text-left text-slate-500')}>{formatDateTime(request.createdAt)}</td>
-                    <td className={cn(overviewTableCell, 'whitespace-nowrap text-slate-950')}>{requestCabinetLabel(request)}</td>
+                    <td
+                      className={cn(
+                        overviewTableCell,
+                        'overview-request-rail relative !border-l-0 text-center text-slate-950',
+                        overviewStatusRailClass(requestTone),
+                      )}
+                    >
+                      {requestNumber}
+                    </td>
+                    <td className={cn(overviewTableCell, 'whitespace-nowrap text-center text-slate-500')} title={formatDateTime(request.createdAt)}>
+                      <span className="inline-flex items-center whitespace-nowrap">
+                        <span className="font-medium text-slate-950">{formatRequestDateLabel(request.createdAt)}</span>
+                        <span className="mx-1 text-slate-300">·</span>
+                        <span>{formatRequestTimeLabel(request.createdAt)}</span>
+                      </span>
+                    </td>
+                    <td className={cn(overviewTableCell, 'whitespace-nowrap text-slate-950')}>
+                      <span className="block truncate">
+                        {requestCabinetLabel(request)}
+                      </span>
+                    </td>
                     <td className={overviewTableCell}>
-                      <div className="max-w-[410px] truncate text-slate-950" title={requestTitle(request)}>
+                      <div className="whitespace-normal break-words text-slate-950" title={requestTitle(request)}>
                         {requestTitle(request)}
                       </div>
                     </td>
                     <td className={cn(overviewTableCell, 'text-center')}>
                       <div className="flex justify-center">
-                        <StatusPill className="whitespace-nowrap !font-normal" tone={statusTone(request.status)}>
+                        <span className={overviewStatusBadgeClass(requestTone)}>
                           {requestStatusLabel(request)}
-                        </StatusPill>
+                        </span>
                       </div>
                     </td>
-                    <td className={cn(overviewTableCell, 'text-center text-slate-950')}>{request.lines.length}</td>
+                    <td className={cn(overviewTableCell, 'text-center text-slate-950')}>
+                      <span className="inline-block whitespace-nowrap">
+                        {request.lines.length}
+                      </span>
+                    </td>
+                    <td className={cn(overviewTableCell, 'whitespace-nowrap text-center text-slate-950')} title={request.createdBy}>
+                      {authorName}
+                    </td>
                     <td className={overviewTableCell}>
                       <div className="whitespace-normal break-words text-slate-600" title={request.comment}>
                         {request.comment || ''}
@@ -601,10 +948,64 @@ export function SeniorWorkspacePage() {
 
   return (
     <PageTransition className="h-full min-h-0 overflow-hidden">
-      <section className="flex h-full min-h-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        {!isRequestOverview ? (
-          <aside className="app-section-band hidden min-h-0 w-[270px] shrink-0 flex-col border-r border-slate-200 xl:flex">
-            <div className="min-h-0 flex-1 overflow-auto p-3">
+      <section
+        ref={isRequestsMode ? requestWorkspaceRef : undefined}
+        className="relative flex h-full min-h-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+      >
+        <AnimatePresence initial={false}>
+          {isRequestOverview ? (
+            <motion.div
+              key="requests-table-morph"
+              initial={shouldReduceMotion ? false : { width: compactRequestPaneWidth, opacity: 1 }}
+              animate={{ width: requestWorkspaceWidth || '100%', opacity: 1 }}
+              exit={shouldReduceMotion
+                ? { opacity: 0 }
+                : { width: compactRequestPaneWidth, opacity: [1, 1, 0] }}
+              transition={shouldReduceMotion
+                ? { duration: 0 }
+                : {
+                    width: requestPaneTransition,
+                    opacity: { duration: requestMorphDurationMs / 1000, times: [0, 0.74, 1], ease: 'linear' },
+                  }}
+              className="absolute bottom-0 left-0 z-30 overflow-hidden bg-white"
+              style={{
+                top: requestOverviewHeaderHeight || 98,
+                transformOrigin: 'left top',
+                willChange: shouldReduceMotion ? 'auto' : 'width, opacity',
+              }}
+            >
+              <div
+                className="flex h-full flex-col"
+                style={{ width: requestWorkspaceWidth || '100%' }}
+              >
+                {renderRequestsOverview()}
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+
+        <AnimatePresence initial={false} mode="popLayout">
+          {!isRequestOverview ? (
+          <motion.aside
+            layout
+            key={isRequestsMode ? 'compact-requests-pane' : 'workspace-sidebar'}
+            initial={isRequestsMode || shouldReduceMotion ? false : { width: 0, opacity: 0 }}
+            animate={{ width: isRequestsMode ? compactRequestPaneWidth : 270, opacity: 1 }}
+            exit={isRequestsMode ? { opacity: 0 } : shouldReduceMotion ? { width: 0 } : { width: 0, opacity: 0 }}
+            transition={requestPaneTransition}
+            className="app-section-band hidden min-h-0 shrink-0 flex-col overflow-hidden border-r border-slate-200 xl:flex"
+            style={{ willChange: shouldReduceMotion ? 'auto' : 'width, opacity' }}
+          >
+            <motion.div
+              initial={shouldReduceMotion ? false : isRequestsMode ? { opacity: 0 } : { opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ ...requestContentTransition, delay: shouldReduceMotion ? 0 : 0.12 }}
+              className={cn(
+                'min-h-0 flex-1 p-2.5',
+                isRequestsMode ? 'flex flex-col overflow-hidden' : 'overflow-auto',
+              )}
+              style={{ width: isRequestsMode ? compactRequestPaneWidth : 270 }}
+            >
               {isRequestsMode ? (
                 <button
                   type="button"
@@ -613,7 +1014,7 @@ export function SeniorWorkspacePage() {
                     setSelectedCategory(allCategory)
                     setQuery('')
                   }}
-                  className="mb-3 inline-flex h-8 w-auto items-center gap-1.5 rounded-md border border-[#b9decf] bg-white/82 px-2.5 text-xs font-semibold text-[#587367] transition hover:border-emerald-300 hover:bg-white hover:text-emerald-800"
+                  className="mb-3 inline-flex h-8 w-auto items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/30"
                   title="Вернуться к списку заявок"
                 >
                   <ArrowLeft size={14} />
@@ -648,65 +1049,104 @@ export function SeniorWorkspacePage() {
                 </>
               ) : null}
 
-              <div className="mt-4 border-t border-slate-200 pt-3">
+              <div className={cn(
+                'mt-4 border-t border-slate-200 pt-3',
+                isRequestsMode && 'flex min-h-0 flex-1 flex-col',
+              )}>
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Заявки</div>
-                <div className="mt-2 grid gap-2">
-                  {sortedRequests.map((request) => {
+                <motion.div
+                  ref={isRequestsMode ? compactRequestListRef : undefined}
+                  className={cn(
+                    'mt-2 grid gap-2',
+                    isRequestsMode && 'min-h-0 flex-1 content-start overflow-y-auto pr-1',
+                  )}
+                >
+                  {compactRequests.map((request) => {
                     const active = selectedRequest?.id === request.id
+                    const requestTone = statusTone(request.status)
 
                     return (
                       <button
                         key={request.id}
+                        ref={isRequestsMode && active ? selectedCompactRequestRef : undefined}
                         type="button"
+                        data-testid={isRequestsMode ? `compact-request-${request.id}` : undefined}
+                        aria-pressed={isRequestsMode ? active : undefined}
+                        aria-label={isRequestsMode
+                          ? `${requestCabinetLabel(request)}, ${formatDateTime(request.createdAt)}, ${request.lines.length} позиций, статус: ${requestStatusLabel(request)}`
+                          : undefined}
+                        title={isRequestsMode ? `Статус: ${requestStatusLabel(request)}` : undefined}
                         onClick={() => (isRequestsMode ? openRequest(request.id) : setActiveRequest(request.id))}
                         className={cn(
-                          'w-full min-w-0 overflow-hidden rounded-md border p-2 text-left transition',
+                          'w-full min-w-0 overflow-hidden rounded-md border text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2',
+                          isRequestsMode
+                            ? cn(
+                                'overview-request-rail relative min-h-[58px] px-2.5 py-2 pl-3 focus-visible:ring-slate-400/40',
+                                overviewStatusRailClass(requestTone),
+                                overviewStatusHoverClass(requestTone),
+                              )
+                            : 'p-2 focus-visible:ring-slate-400/40',
                           active
-                            ? 'border-emerald-300 bg-white shadow-sm'
-                            : 'border-transparent hover:border-slate-200 hover:bg-white',
+                            ? 'border-slate-400 bg-slate-50 shadow-sm'
+                            : isRequestsMode
+                              ? 'border-slate-200/80 bg-white/70 hover:border-slate-300'
+                              : 'border-transparent hover:border-slate-200 hover:bg-white',
                         )}
                       >
-                        <div className="flex min-w-0 items-center gap-2">
-                          <span className="min-w-0 flex-1 truncate font-semibold text-slate-950">{requestCabinetLabel(request)}</span>
-                          <StatusPill className="shrink-0" tone={statusTone(request.status)}>{requestStatusLabel(request)}</StatusPill>
-                        </div>
-                        <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-slate-500">
-                          <span className="min-w-0 flex-1 truncate">{requestTitle(request)}</span>
-                          <span className="shrink-0">{request.lines.length} позиций</span>
-                        </div>
+                        {isRequestsMode ? (
+                          <>
+                            <div className="min-w-0 truncate text-sm font-semibold text-slate-950">
+                              {requestCabinetLabel(request)}
+                            </div>
+                            <div className="mt-1.5 flex min-w-0 items-center justify-start gap-2 text-xs text-slate-500">
+                              <time className="shrink-0" dateTime={request.createdAt}>
+                                {formatRequestDateLabel(request.createdAt)} · {formatRequestTimeLabel(request.createdAt)}
+                              </time>
+                              <span className="shrink-0 font-medium text-slate-600">
+                                {request.lines.length} поз.
+                              </span>
+                            </div>
+                            <span className="sr-only">Статус: {requestStatusLabel(request)}</span>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="min-w-0 flex-1 truncate font-semibold text-slate-950">{requestCabinetLabel(request)}</span>
+                              <StatusPill className="shrink-0" tone={requestTone}>{requestStatusLabel(request)}</StatusPill>
+                            </div>
+                            <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-slate-500">
+                              <span className="min-w-0 flex-1 truncate">{requestTitle(request)}</span>
+                              <span className="shrink-0">{request.lines.length} позиций</span>
+                            </div>
+                          </>
+                        )}
                       </button>
                     )
                   })}
-                </div>
+                </motion.div>
               </div>
-            </div>
-          </aside>
-        ) : null}
+            </motion.div>
+          </motion.aside>
+          ) : null}
+        </AnimatePresence>
 
-        <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="shrink-0 border-b border-slate-200 bg-white p-4">
+        <motion.section
+          layout
+          transition={requestPaneTransition}
+          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+        >
+          <motion.div
+            ref={isRequestsMode ? requestWorkspaceHeaderRef : undefined}
+            layout
+            transition={requestPaneTransition}
+            className="shrink-0 border-b border-slate-200 bg-white p-4"
+          >
             <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-start 2xl:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-lg font-semibold leading-none text-slate-950">
                     {isRequestOverview ? 'Заявки кабинетов' : isRequestsMode ? `Состав заявки: ${requestTitle(selectedRequest)}` : 'Материалы и выдача'}
                   </h1>
-                  {isRequestOverview ? (
-                    <button
-                      type="button"
-                      onClick={() => setOverviewFiltersOpen((current) => !current)}
-                      className={cn(
-                        'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/20',
-                        overviewFiltersOpen || overviewQuery
-                          ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-950',
-                      )}
-                      title="Фильтры поиска"
-                    >
-                      <ListFilter size={15} />
-                      Фильтры
-                    </button>
-                  ) : null}
                   {!isRequestOverview && selectedRequest ? (
                     <StatusPill tone={statusTone(selectedRequest.status)}>
                       {requestStatusLabel(selectedRequest)}
@@ -729,32 +1169,151 @@ export function SeniorWorkspacePage() {
               ) : null}
             </div>
 
-            {isRequestOverview && overviewFiltersOpen ? (
-              <div className="app-soft-card mt-3 flex flex-wrap items-center gap-2 rounded-md border p-2">
-                <label className="relative min-w-[260px] flex-1">
+            {isRequestOverview ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <label className="relative h-9 min-w-[230px] flex-1 max-w-[340px]">
                   <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                   <input
                     value={overviewQuery}
                     onChange={(event) => setOverviewQuery(event.target.value)}
-                    className={cn(fieldStyles, 'h-9 px-3 py-2 pl-9 text-sm')}
-                    placeholder="Поиск по кабинету, заявке или позиции"
+                    className={cn(overviewFilterControl, 'w-full pl-9')}
+                    placeholder="Поиск по названию"
                   />
                 </label>
-                {overviewQuery ? (
+
+                <label className="relative h-9 w-[150px]">
+                  <select
+                    value={overviewStatusFilter}
+                    onChange={(event) => setOverviewStatusFilter(event.target.value as RequestStatus | typeof allOverviewFilter)}
+                    className={cn(overviewFilterControl, 'w-full appearance-none pr-8')}
+                  >
+                    <option value={allOverviewFilter}>Все статусы</option>
+                    {overviewStatusOptions.map((status) => (
+                      <option key={status} value={status}>
+                        {status === 'sent' ? 'Ожидает' : requestStatusLabels[status]}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                </label>
+
+                <label className="relative h-9 w-[150px]">
+                  <select
+                    value={overviewRoomFilter}
+                    onChange={(event) => setOverviewRoomFilter(event.target.value)}
+                    className={cn(overviewFilterControl, 'w-full appearance-none pr-8')}
+                  >
+                    <option value={allOverviewFilter}>Все кабинеты</option>
+                    {overviewRoomOptions.map((room) => (
+                      <option key={room.id} value={room.id}>
+                        {room.number} {room.title}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                </label>
+
+                <div ref={overviewDateMenuRef} className="relative h-9 w-[168px]">
                   <button
                     type="button"
-                    onClick={() => setOverviewQuery('')}
-                    className="h-9 rounded-md border border-[#b9decf] bg-white/82 px-3 text-xs font-semibold text-[#587367] transition hover:bg-white hover:text-[#17362d]"
+                    onClick={() => setOverviewDateMenuOpen((current) => !current)}
+                    className={cn(overviewFilterControl, 'flex w-full items-center gap-2 pr-8 text-left')}
+                    aria-expanded={overviewDateMenuOpen}
                   >
-                    Сбросить
+                    <CalendarDays className="shrink-0 text-slate-500" size={15} />
+                    <span className="min-w-0 flex-1 truncate">{overviewDateLabel(overviewDatePreset)}</span>
                   </button>
-                ) : null}
+                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+
+                  {overviewDateMenuOpen ? (
+                    <div className="absolute left-0 top-10 z-30 w-[310px] rounded-md border border-slate-200 bg-white p-2 text-sm text-slate-700 shadow-xl">
+                      <div className="grid gap-1">
+                        {[
+                          ['all', 'Все даты'],
+                          ['latest-week', 'За неделю'],
+                          ['latest-month', 'За месяц'],
+                          ['latest-year', 'За год'],
+                        ].map(([value, label]) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => {
+                              setOverviewDatePreset(value as OverviewDatePreset)
+                              setOverviewDateMenuOpen(false)
+                            }}
+                            className={cn(
+                              'flex h-8 items-center rounded-md px-2 text-left transition hover:bg-slate-50',
+                              overviewDatePreset === value && 'bg-emerald-50 text-emerald-800',
+                            )}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="my-2 border-t border-slate-100" />
+
+                      <div className="grid gap-2">
+                        <div className="text-xs font-medium text-slate-500">Свой период</div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="grid gap-1 text-[11px] text-slate-500">
+                            c
+                            <input
+                              type="date"
+                              value={overviewCustomStartValue}
+                              onInput={(event) => {
+                                setOverviewCustomStartDate(event.currentTarget.value)
+                                setOverviewDatePreset('custom')
+                              }}
+                              onChange={(event) => {
+                                setOverviewCustomStartDate(event.target.value)
+                                setOverviewDatePreset('custom')
+                              }}
+                              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-700/10"
+                            />
+                          </label>
+                          <label className="grid gap-1 text-[11px] text-slate-500">
+                            по
+                            <input
+                              type="date"
+                              value={overviewCustomEndValue}
+                              onInput={(event) => {
+                                setOverviewCustomEndDate(event.currentTarget.value)
+                                setOverviewDatePreset('custom')
+                              }}
+                              onChange={(event) => {
+                                setOverviewCustomEndDate(event.target.value)
+                                setOverviewDatePreset('custom')
+                              }}
+                              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-700/10"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={resetOverviewFilters}
+                  className={cn(
+                    'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border px-3 text-sm font-normal transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/15',
+                    overviewFiltersActive
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950',
+                  )}
+                  title={overviewFiltersActive ? 'Сбросить фильтры' : 'Фильтры'}
+                >
+                  <ListFilter size={15} />
+                  Фильтры
+                </button>
               </div>
             ) : null}
 
             {!isRequestOverview ? (
-              <div className="mt-4 grid gap-3 xl:grid-cols-[260px_minmax(0,1fr)] xl:items-stretch">
-                <div className="app-soft-card grid gap-2 rounded-md border p-2">
+              <div className="mt-4 grid items-start gap-3 min-[1500px]:grid-cols-[260px_minmax(0,1fr)]">
+                <div className="app-soft-card grid grid-cols-2 content-start gap-2 rounded-md border p-2 min-[1500px]:grid-cols-1">
                   <select
                     value={selectedCategory}
                     onChange={(event) => setSelectedCategory(event.target.value)}
@@ -781,12 +1340,19 @@ export function SeniorWorkspacePage() {
                 {isRequestsMode ? renderRequestContext() : <div />}
               </div>
             ) : null}
-          </div>
+          </motion.div>
 
-          {isRequestOverview ? (
-            renderRequestsOverview()
-          ) : (
-            <>
+          <div className="relative min-h-0 flex-1 overflow-hidden">
+            <AnimatePresence initial={false}>
+              {!isRequestOverview ? (
+                <motion.div
+                  key="request-detail"
+                  initial={shouldReduceMotion ? false : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ ...requestContentTransition, delay: shouldReduceMotion ? 0 : 0.08 }}
+                  className="absolute inset-0 flex min-h-0 flex-col"
+                >
           <div className="app-section-band flex min-h-0 flex-1 flex-col p-3">
             <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
               <div className="h-full overflow-y-auto overflow-x-hidden">
@@ -830,6 +1396,7 @@ export function SeniorWorkspacePage() {
                   const hasPartialQuantity = Math.round(Number(partialQuantity) || 0) > 0
                   const active = selectedItem?.id === item.id
                   const isIssued = requestLine?.status === 'issued'
+                  const isPartiallyIssued = requestLine?.status === 'partially-issued'
                   const isOutOfStockRequestLine = Boolean(requestLine && remaining > 0 && available <= 0)
                   const isLineInReplenishment = Boolean(
                     requestLine &&
@@ -839,16 +1406,18 @@ export function SeniorWorkspacePage() {
                   const rowTone =
                     isOutOfStockRequestLine
                       ? 'bg-rose-100/80 hover:!bg-rose-100/90'
-                      : isIssued
-                      ? 'bg-sky-100/80'
                       : issueDraft?.mode === 'full'
-                      ? 'bg-emerald-50/80'
+                      ? 'bg-emerald-50/80 hover:!bg-emerald-50'
                       : issueDraft?.mode === 'partial' && hasPartialQuantity
-                        ? 'bg-amber-50/80'
-                        : active
-                          ? 'bg-sky-50/45'
-                          : requestLine
-                            ? 'bg-sky-50/45'
+                        ? 'bg-amber-50/80 hover:!bg-amber-50'
+                        : isIssued
+                          ? 'bg-emerald-50/80 hover:!bg-emerald-50'
+                          : isPartiallyIssued
+                            ? 'bg-amber-50/80 hover:!bg-amber-50'
+                            : requestLine
+                              ? 'bg-white'
+                              : active
+                                ? 'bg-slate-100/55'
                             : index % 2
                               ? 'bg-white'
                               : 'bg-slate-50/35'
@@ -900,7 +1469,7 @@ export function SeniorWorkspacePage() {
                       <td className={cn(detailTableCell, 'text-center')}>{formatNumber(item.minStock)}</td>
                       <td className={detailTableCell}>
                         <div className="flex justify-center">
-                          <StatusPill className="whitespace-nowrap !font-normal" tone={isIssued ? 'info' : statusTone(requestLine?.status ?? stockStatus)}>
+                          <StatusPill className="whitespace-nowrap !font-normal" tone={statusTone(requestLine?.status ?? stockStatus)}>
                             {requestLine ? requestLineStatusLabels[requestLine.status] : stockStatusLabels[stockStatus]}
                           </StatusPill>
                         </div>
@@ -1037,9 +1606,11 @@ export function SeniorWorkspacePage() {
               </Button>
             </div>
           </div>
-            </>
-          )}
-        </section>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </div>
+        </motion.section>
       </section>
 
       {issueConfirmationStatus === 'loading' ? (

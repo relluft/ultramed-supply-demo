@@ -1,25 +1,82 @@
-import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Home, Plus, Search, Trash2, X } from 'lucide-react'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import {
+  ArrowLeft,
+  BookOpen,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  ClipboardList,
+  ListFilter,
+  Plus,
+  Search,
+  Star,
+  Settings,
+  Trash2,
+  DoorOpen,
+  X,
+} from 'lucide-react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { BrandedLoadingModal } from '../components/BrandedLoadingModal'
+import {
+  ManualItemWorkspaceDialog,
+  RequestPreviewWorkspaceDialog,
+  RequestSubmitDoneWorkspaceDialog,
+  RequestSubmitLoadingDialog,
+} from '../components/NurseRequestDialogs'
 import { PageTransition } from '../components/PageTransition'
-import { Button, EmptyState, Panel, StatusPill, fieldStyles } from '../components/ui'
+import { EmptyState } from '../components/ui'
+import {
+  HorizontalScroller,
+  IconButton,
+  StatusBadge as StatusPill,
+  Surface as Panel,
+  TableFrame,
+  TableViewport,
+  WorkspaceButton as Button,
+  WorkspaceDialog,
+  WorkspacePortal,
+  workspaceFieldClassName as fieldStyles,
+  workspaceTableCell,
+  workspaceTableHeaderCell,
+} from '../components/workspace-v2'
+import '../styles/nurse-cabinet-v2.css'
 import { useDemo } from '../context'
 import { getRoomByRole, requestLineStatusLabels, requestStatusLabels, roleToRoomId, statusTone } from '../lib/demoLogic'
 import { cn, formatDateTime, formatNumber } from '../lib/format'
 import type { CatalogItem, RequestCartLine, Room, SupplyRequest, SupplyRequestLine } from '../types/demo'
 
 const orthodonticDemoRequestId = 'REQ-005'
-const requestTableHeaderCell =
-  'sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95 px-3 py-2 text-left text-[11px] font-normal uppercase tracking-wide text-slate-500'
-const requestTableCell = 'border-b border-slate-100 px-3 py-2 align-top text-[13px] leading-4 text-slate-700'
+const requestTableHeaderCell = workspaceTableHeaderCell
+const requestTableCell = workspaceTableCell
 const submitLoadingMs = 750
+const requestCartMinimumWidth = 320
+const requestCartDefaultWidth = 340
+const requestCatalogMinimumWidth = 620
+const requestCatalogResizeMinimumWidth = 320
+const requestSeparatorWidth = 20
+const requestStackThreshold =
+  requestCatalogMinimumWidth + requestCartMinimumWidth + requestSeparatorWidth
 
-function ModalPortal({ children }: { children: ReactNode }) {
-  if (typeof document === 'undefined') return null
+type CSSVariables = CSSProperties & Record<`--${string}`, string>
+function getRequestCartMaximumWidth(workspaceWidth: number) {
+  return Math.max(
+    requestCartMinimumWidth,
+    workspaceWidth - requestCatalogResizeMinimumWidth - requestSeparatorWidth,
+  )
+}
 
-  return createPortal(children, document.body)
+
+function clampRequestCartWidth(width: number, workspaceWidth: number) {
+  const maximumWidth = getRequestCartMaximumWidth(workspaceWidth)
+  return Math.round(Math.min(Math.max(width, requestCartMinimumWidth), maximumWidth))
 }
 
 const catalogVariantGroups = [
@@ -254,12 +311,6 @@ const catalogCategoryRank = new Map(
     (category, index) => [category, index],
   ),
 )
-const frequentItemIdsByRoomId: Record<string, string[]> = {
-  'room-101': ['item-gloves-m', 'item-masks', 'item-saliva-ejectors', 'item-cotton-rolls', 'item-cofferdam', 'item-composite-a2'],
-  'room-102': ['item-sterile-gloves-7', 'item-masks', 'item-sterile-gauze', 'item-suture-4-0', 'item-scalpel-blades-15', 'item-chlorhexidine'],
-  'room-105': ['item-gloves-m', 'item-masks', 'item-niti-archwires', 'item-elastic-ligatures', 'item-ortho-wax', 'item-ortho-elastics', 'item-elastic-chain'],
-}
-
 function catalogSortRank(item: CatalogItem) {
   const group = catalogGroupByItemId.get(item.id)
   return {
@@ -298,6 +349,22 @@ function catalogItemProfessionalName(item: CatalogItem) {
 function getGroupCategoryLabel(items: CatalogItem[]) {
   const categories = Array.from(new Set(items.map((item) => item.category)))
   return categories.length === 1 ? categories[0] : `${categories.length} раздела`
+}
+
+const clinicalCatalogDirections = new Set(['Ортодонтия', 'Ортопедия', 'Терапия', 'Хирургия'])
+
+function catalogDirectionLabel(item: CatalogItem) {
+  return clinicalCatalogDirections.has(item.category) ? item.category : 'Общее'
+}
+
+function getGroupDirectionLabel(items: CatalogItem[]) {
+  const directions = Array.from(new Set(items.map(catalogDirectionLabel)))
+  return directions.length === 1 ? directions[0] : 'Смешанное'
+}
+
+function getGroupUnitLabel(items: CatalogItem[]) {
+  const units = Array.from(new Set(items.map((item) => item.unit)))
+  return units.length === 1 ? units[0] : 'разн.'
 }
 
 function requestIssueSummary(request: { status: string; lines: { quantity: number; issuedQuantity: number; status: string }[] }) {
@@ -353,22 +420,22 @@ function requestLineIssueStatus(line: SupplyRequestLine, isProcessed: boolean) {
   const missingQuantity = Math.max(line.quantity - line.issuedQuantity, 0)
 
   if (!isProcessed) {
-    return { tone: 'info' as const, label: requestLineStatusLabels[line.status], rowClassName: '' }
+    return { tone: 'info' as const, label: requestLineStatusLabels[line.status] }
   }
 
   if (missingQuantity <= 0) {
-    return { tone: 'success' as const, label: 'Выдано', rowClassName: 'bg-emerald-50/70' }
+    return { tone: 'success' as const, label: 'Выдано' }
   }
 
   if (line.issuedQuantity > 0) {
-    return { tone: 'warning' as const, label: 'Выдано частично', rowClassName: 'bg-amber-50' }
+    return { tone: 'warning' as const, label: 'Выдано частично' }
   }
 
   if (line.status === 'manual-line' || line.status === 'needs-clarification') {
-    return { tone: 'danger' as const, label: requestLineStatusLabels[line.status], rowClassName: 'bg-rose-50' }
+    return { tone: 'danger' as const, label: requestLineStatusLabels[line.status] }
   }
 
-  return { tone: 'danger' as const, label: 'Не выдано', rowClassName: 'bg-rose-50' }
+  return { tone: 'danger' as const, label: 'Не выдано' }
 }
 
 function ManualItemModal({
@@ -498,8 +565,8 @@ function RequestPreviewModal({
               <div className="mt-0.5 text-xs text-slate-500">{room?.type}</div>
             </div>
             <div>
-              <div className="text-xs font-normal uppercase tracking-wide text-slate-400">Ответственный</div>
-              <div className="mt-1 font-normal text-slate-950">{room?.nurseName ?? 'Не указан'}</div>
+              <div className="text-xs font-normal uppercase tracking-wide text-slate-400">Ответственная</div>
+              <div className="mt-1 font-normal text-slate-950">Выбирается при создании заявки</div>
               <div className="mt-0.5 text-xs text-slate-500">Отправка старшей медсестре</div>
             </div>
             <div>
@@ -601,6 +668,9 @@ function RequestSubmitDoneModal({ onClose }: { onClose: () => void }) {
 function RequestCart({
   cart,
   catalog,
+  room,
+  responsibleNurse,
+  onResponsibleNurseChange,
   onUpdate,
   onRemove,
   onSubmit,
@@ -608,29 +678,45 @@ function RequestCart({
 }: {
   cart: RequestCartLine[]
   catalog: CatalogItem[]
+  room?: Room
+  responsibleNurse: string
+  onResponsibleNurseChange: (name: string) => void
   onUpdate: (lineId: string, patch: Partial<RequestCartLine>) => void
   onRemove: (lineId: string) => void
-  onSubmit: (comment: string) => void
+  onSubmit: (comment: string, responsibleNurse: string) => void
   onDemo: () => void
 }) {
   const [comment, setComment] = useState('')
+  const commentRef = useRef<HTMLTextAreaElement | null>(null)
+
+  useLayoutEffect(() => {
+    const textarea = commentRef.current
+    if (!textarea) return
+
+    textarea.style.height = '0px'
+    const borderHeight = textarea.offsetHeight - textarea.clientHeight
+    const contentHeight = textarea.scrollHeight + borderHeight
+    const maximumHeight = 256
+    textarea.style.height = `${Math.min(contentHeight, maximumHeight)}px`
+    textarea.style.overflowY = contentHeight > maximumHeight ? 'auto' : 'hidden'
+  }, [comment])
 
   return (
-    <Panel className="flex h-full min-h-0 flex-col overflow-hidden p-0">
+    <div className="nurse-cart">
       <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white">
         <div className="min-w-0 px-3 py-2.5">
           <div className="text-base font-normal text-slate-950">Заявка</div>
           <div className="text-xs text-slate-500">Строк: {cart.length}</div>
         </div>
         <div className="mr-3 flex shrink-0 items-center gap-2">
-          <Button variant="secondary" className="min-h-8 px-2 py-1 text-xs" onClick={onDemo}>
+          <Button variant="secondary" className="px-2 text-xs" onClick={onDemo}>
             Демо
           </Button>
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-        <table className="w-full table-fixed border-separate border-spacing-0">
+      <TableViewport label="Состав заявки" className="nurse-cart-body">
+        <table className="nurse-cart-table w-full table-fixed border-separate border-spacing-0">
           <colgroup>
             <col className="w-[10%]" />
             <col className="w-[56%]" />
@@ -669,18 +755,19 @@ function RequestCart({
                         min={1}
                         value={line.quantity}
                         onChange={(event) => onUpdate(line.id, { quantity: Number(event.target.value) })}
-                        className="h-7 w-full rounded-md border border-slate-200 bg-white px-1.5 text-center text-xs text-slate-950 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
+                        className={cn(fieldStyles, 'w-full px-1.5 text-center text-xs')}
+                        aria-label={`Количество: ${item ? catalogItemProfessionalName(item) : line.manualName}`}
                       />
                     </td>
                     <td className={cn(requestTableCell, '!px-1 text-center')}>
-                      <button
-                        type="button"
+                      <IconButton
                         onClick={() => onRemove(line.id)}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-rose-50 hover:text-rose-700"
+                        variant="ghost"
+                        className="text-slate-600 hover:text-rose-800"
                         aria-label="Удалить строку"
                       >
                         <Trash2 size={14} />
-                      </button>
+                      </IconButton>
                     </td>
                   </tr>
                 )
@@ -694,22 +781,52 @@ function RequestCart({
             )}
           </tbody>
         </table>
-      </div>
+      </TableViewport>
 
-      <div className="grid gap-2 border-t border-slate-200 bg-white p-3">
-        <textarea
-          value={comment}
-          onChange={(event) => setComment(event.target.value)}
-          className={`min-h-16 resize-none ${fieldStyles}`}
-          placeholder="Комментарий"
-        />
+      <div className="grid gap-2.5 border-t border-slate-200 bg-slate-50/60 p-3">
+        <div className="grid gap-1.5">
+          <label htmlFor="responsible-nurse" className="w-fit text-sm font-medium text-slate-900">
+            Ответственный
+          </label>
+          <select
+            id="responsible-nurse"
+            value={responsibleNurse}
+            onChange={(event) => onResponsibleNurseChange(event.target.value)}
+            className={cn(fieldStyles, 'border-slate-300 bg-white shadow-sm')}
+            required
+          >
+            <option value="">Выбрать</option>
+            {(room?.nurseNames ?? []).map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="grid gap-1.5">
+          <label htmlFor="request-comment" className="w-fit text-sm font-medium text-slate-900">
+            Комментарий
+          </label>
+          <textarea
+            ref={commentRef}
+            id="request-comment"
+            value={comment}
+            onChange={(event) => setComment(event.target.value)}
+            rows={5}
+            className={cn(fieldStyles, 'nurse-request-comment resize-none overflow-x-hidden border-slate-300 bg-white py-2.5 leading-5 shadow-sm')}
+          />
+        </div>
         <div className="grid gap-2">
-          <Button className="min-h-8 px-2 py-1 text-xs" disabled={!cart.length} onClick={() => onSubmit(comment)}>
+          <Button
+            className="px-2 text-xs"
+            disabled={!cart.length || !responsibleNurse}
+            onClick={() => onSubmit(comment, responsibleNurse)}
+          >
             Сформировать
           </Button>
         </div>
       </div>
-    </Panel>
+    </div>
   )
 }
 
@@ -730,28 +847,72 @@ export function NurseCabinetPage() {
   const cart = roomId ? carts[roomId] ?? [] : []
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('Все')
+  const [catalogUnit, setCatalogUnit] = useState('Все')
+  const [catalogPositionType, setCatalogPositionType] = useState<'all' | 'grouped' | 'single'>('all')
+  const [onlyRequestItems, setOnlyRequestItems] = useState(false)
+  const [favoriteCatalogItemIds, setFavoriteCatalogItemIds] = useState<Set<string>>(() => new Set())
+  const [onlyFavoriteItems, setOnlyFavoriteItems] = useState(false)
+  const [isCatalogFiltersOpen, setCatalogFiltersOpen] = useState(false)
   const [isManualOpen, setManualOpen] = useState(false)
   const [manualInitialName, setManualInitialName] = useState('')
   const [isPreviewOpen, setPreviewOpen] = useState(false)
   const [previewComment, setPreviewComment] = useState('')
+  const [responsibleNurse, setResponsibleNurse] = useState('')
+  const [previewResponsibleNurse, setPreviewResponsibleNurse] = useState('')
   const [isSubmitLoading, setSubmitLoading] = useState(false)
   const [isSubmitDoneOpen, setSubmitDoneOpen] = useState(false)
   const [expandedGroupIds, setExpandedGroupIds] = useState<Record<string, boolean>>({})
   const [selectedHistoryRequestId, setSelectedHistoryRequestId] = useState<string | null>(null)
+  const [cartPanelWidth, setCartPanelWidth] = useState(requestCartDefaultWidth)
+  const [requestWorkspaceWidth, setRequestWorkspaceWidth] = useState(0)
+  const requestWorkspaceRef = useRef<HTMLDivElement>(null)
+  const cartResizeRef = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(null)
+  const isRequestWorkspace = location.hash === '#request'
+  const isRequestStacked = requestWorkspaceWidth > 0 && requestWorkspaceWidth < requestStackThreshold
 
   useEffect(() => {
     if (!isSubmitLoading) return
 
     const timer = window.setTimeout(() => {
-      submitRequest(previewComment)
+      submitRequest(previewResponsibleNurse, previewComment)
       navigate('/cabinet#request', { replace: true })
       setPreviewComment('')
+      setResponsibleNurse('')
+      setPreviewResponsibleNurse('')
+      setPreviewOpen(false)
       setSubmitLoading(false)
       setSubmitDoneOpen(true)
     }, submitLoadingMs)
 
     return () => window.clearTimeout(timer)
-  }, [isSubmitLoading, navigate, previewComment, submitRequest])
+  }, [isSubmitLoading, navigate, previewComment, previewResponsibleNurse, submitRequest])
+
+  useLayoutEffect(() => {
+    if (!isRequestWorkspace) return undefined
+
+    const workspace = requestWorkspaceRef.current
+    if (!workspace) return undefined
+
+    const syncWidth = () => {
+      const width = workspace.clientWidth
+      setRequestWorkspaceWidth(width)
+      setCartPanelWidth((current) => clampRequestCartWidth(current, width))
+    }
+
+    syncWidth()
+
+    const observer = new ResizeObserver(syncWidth)
+    observer.observe(workspace)
+
+    return () => observer.disconnect()
+  }, [isRequestWorkspace])
+
+  useEffect(
+    () => () => {
+      document.body.style.userSelect = ''
+    },
+    [],
+  )
 
   const categories = useMemo(
     () => [
@@ -778,6 +939,22 @@ export function NurseCabinetPage() {
         }),
     [catalog],
   )
+  const catalogUnits = useMemo(
+    () => ['Все', ...Array.from(new Set(activeCatalog.map((item) => item.unit))).sort((left, right) => left.localeCompare(right, 'ru'))],
+    [activeCatalog],
+  )
+  const clinicalDirections = useMemo(
+    () => categories.filter((item) => ['Ортодонтия', 'Ортопедия', 'Терапия', 'Хирургия'].includes(item)),
+    [categories],
+  )
+  const materialTypes = useMemo(
+    () => categories.filter((item) => item !== 'Все' && !clinicalDirections.includes(item)),
+    [categories, clinicalDirections],
+  )
+  const cartItemIds = useMemo(
+    () => new Set(cart.map((line) => line.itemId).filter((itemId): itemId is string => Boolean(itemId))),
+    [cart],
+  )
   const visibleCatalog = useMemo(() => {
     return activeCatalog
       .filter((item) => {
@@ -785,7 +962,16 @@ export function NurseCabinetPage() {
         return matchesQuery(item, query) || Boolean(group && matchesGroupQuery(group, query))
       })
       .filter((item) => category === 'Все' || item.category === category)
-  }, [activeCatalog, category, query])
+      .filter((item) => catalogUnit === 'Все' || item.unit === catalogUnit)
+      .filter((item) => {
+        const grouped = catalogGroupByItemId.has(item.id)
+        if (catalogPositionType === 'grouped') return grouped
+        if (catalogPositionType === 'single') return !grouped
+        return true
+      })
+      .filter((item) => !onlyRequestItems || cartItemIds.has(item.id))
+      .filter((item) => !onlyFavoriteItems || favoriteCatalogItemIds.has(item.id))
+  }, [activeCatalog, cartItemIds, catalogPositionType, catalogUnit, category, favoriteCatalogItemIds, onlyFavoriteItems, onlyRequestItems, query])
   const catalogDisplayRows = useMemo<CatalogDisplayRow[]>(() => {
     const itemById = new Map(activeCatalog.map((item) => [item.id, item]))
     const visibleItemById = new Map(visibleCatalog.map((item) => [item.id, item]))
@@ -828,6 +1014,12 @@ export function NurseCabinetPage() {
 
     return rows
   }, [activeCatalog, category, expandedGroupIds, query, visibleCatalog])
+  const activeCatalogFilterCount =
+    Number(category !== 'Все') +
+    Number(catalogUnit !== 'Все') +
+    Number(catalogPositionType !== 'all') +
+    Number(onlyRequestItems) +
+    Number(onlyFavoriteItems)
   const cartLineByItem = useMemo(() => {
     const result = new Map<string, RequestCartLine>()
     cart.forEach((line) => {
@@ -835,13 +1027,22 @@ export function NurseCabinetPage() {
     })
     return result
   }, [cart])
-  const frequentItems = useMemo(() => {
-    const frequentIds = roomId ? frequentItemIdsByRoomId[roomId] ?? [] : []
-    return frequentIds
-      .map((itemId) => activeCatalog.find((item) => item.id === itemId))
-      .filter((item): item is CatalogItem => Boolean(item))
-  }, [activeCatalog, roomId])
   const myRequests = requests.filter((request) => request.roomId === roomId)
+  const latestRequest = [...myRequests].sort(
+    (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  )[0]
+  const latestRequestIssue = latestRequest ? requestIssueSummary(latestRequest) : undefined
+  const latestRequestStatus = latestRequest
+    ? latestRequest.status === 'sent' ||
+      latestRequest.status === 'in-review' ||
+      latestRequest.status === 'issued' ||
+      latestRequest.status === 'partially-issued'
+      ? latestRequestIssue
+      : { tone: statusTone(latestRequest.status), label: requestStatusLabels[latestRequest.status] }
+    : undefined
+  const latestRequestTitle = latestRequest
+    ? latestRequest.title?.trim().replace(/_/g, ' ') || requestDisplayTitle(latestRequest, catalog, room)
+    : undefined
   const selectedHistoryRequest = selectedHistoryRequestId
     ? myRequests.find((request) => request.id === selectedHistoryRequestId)
     : undefined
@@ -857,12 +1058,13 @@ export function NurseCabinetPage() {
     setCategory('Все')
   }
 
-  function openRequestPreview(comment: string) {
-    if (!cart.length) return
+  function openRequestPreview(comment: string, selectedResponsible: string) {
+    if (!cart.length || !room?.nurseNames.includes(selectedResponsible)) return
 
     navigate('/cabinet#request', { replace: true })
     setSubmitDoneOpen(false)
     setPreviewComment(comment)
+    setPreviewResponsibleNurse(selectedResponsible)
     setPreviewOpen(true)
   }
 
@@ -870,6 +1072,11 @@ export function NurseCabinetPage() {
     setPreviewOpen(false)
     setSubmitDoneOpen(false)
     setSubmitLoading(true)
+  }
+
+  function cancelRequestSubmit() {
+    setSubmitLoading(false)
+    setPreviewOpen(true)
   }
 
   function updateCatalogLineQuantity(line: RequestCartLine, quantity: number) {
@@ -881,196 +1088,383 @@ export function NurseCabinetPage() {
     updateCartLine(line.id, { quantity })
   }
 
+  function updateCartPanelWidth(width: number) {
+    const workspaceWidth = requestWorkspaceRef.current?.clientWidth ?? requestWorkspaceWidth
+    setCartPanelWidth(clampRequestCartWidth(width, workspaceWidth))
+  }
+
+  function finishCartResize(pointerId: number) {
+    if (cartResizeRef.current?.pointerId !== pointerId) return
+
+    cartResizeRef.current = null
+    document.body.style.userSelect = ''
+  }
+
+  function handleCartResizeStart(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (event.button !== 0) return
+
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    cartResizeRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startWidth: cartPanelWidth,
+    }
+    document.body.style.userSelect = 'none'
+  }
+
+  function handleCartResizeMove(event: ReactPointerEvent<HTMLButtonElement>) {
+    const resize = cartResizeRef.current
+    if (!resize || resize.pointerId !== event.pointerId) return
+
+    updateCartPanelWidth(resize.startWidth + resize.startX - event.clientX)
+  }
+
+  function handleCartResizeKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    const maximumWidth = getRequestCartMaximumWidth(requestWorkspaceWidth)
+    const step = 32
+    let nextWidth: number | null = null
+
+    if (event.key === 'ArrowLeft') nextWidth = cartPanelWidth + step
+    if (event.key === 'ArrowRight') nextWidth = cartPanelWidth - step
+    if (event.key === 'Home') nextWidth = requestCartMinimumWidth
+    if (event.key === 'End') nextWidth = maximumWidth
+
+    if (nextWidth === null) return
+
+    event.preventDefault()
+    updateCartPanelWidth(nextWidth)
+  }
+
   function toggleCatalogGroup(groupId: string) {
     setExpandedGroupIds((current) => ({ ...current, [groupId]: !current[groupId] }))
   }
+
+  function toggleFavoriteCatalogItems(itemIds: string[]) {
+    setFavoriteCatalogItemIds((current) => {
+      const next = new Set(current)
+      const removeItems = itemIds.every((itemId) => next.has(itemId))
+      itemIds.forEach((itemId) => removeItems ? next.delete(itemId) : next.add(itemId))
+      return next
+    })
+  }
+
+  function toggleFavoriteCatalogItem(itemId: string) {
+    toggleFavoriteCatalogItems([itemId])
+  }
+
 
   function renderCatalogItemAction(item: CatalogItem) {
     const cartLine = cartLineByItem.get(item.id)
 
     if (cartLine) {
       return (
-        <div className="inline-flex h-7 items-center overflow-hidden rounded-md border border-emerald-200 bg-white text-xs">
-          <button
-            type="button"
+        <div className="nurse-catalog-stepper">
+          <IconButton
             onClick={() => updateCatalogLineQuantity(cartLine, cartLine.quantity - 1)}
-            className="flex h-7 w-7 items-center justify-center text-slate-600 transition hover:bg-slate-50"
+            className="rounded-none text-slate-700"
             aria-label="Уменьшить количество"
           >
             -
-          </button>
+          </IconButton>
           <input
             type="number"
             min={1}
             value={cartLine.quantity}
             onChange={(event) => updateCatalogLineQuantity(cartLine, Number(event.target.value))}
-            className="h-7 w-10 border-x border-emerald-100 text-center text-xs font-normal text-slate-950 outline-none"
+            className={cn(fieldStyles, 'nurse-catalog-quantity')}
             aria-label="Количество в заявке"
           />
-          <button
-            type="button"
+          <IconButton
             onClick={() => addCatalogToCart(item.id, 1)}
-            className="flex h-7 w-7 items-center justify-center text-emerald-800 transition hover:bg-emerald-50"
+            className="rounded-none text-emerald-800"
             aria-label="Увеличить количество"
           >
             +
-          </button>
+          </IconButton>
         </div>
       )
     }
 
     return (
-      <button
-        type="button"
+      <Button
+        variant="secondary"
         onClick={() => addCatalogToCart(item.id, 1)}
-        className="inline-flex min-h-6 items-center justify-center gap-1 rounded-md border border-emerald-300 bg-white px-2 text-xs text-emerald-800 transition hover:bg-emerald-50"
+        className="shrink-0 px-2 text-xs"
       >
         <Plus size={13} />
         Добавить
-      </button>
+      </Button>
     )
   }
 
   if (!location.hash) {
-    const dashboardItems = [
-      {
-        to: '/cabinet#request',
-        title: 'Заявка',
-        caption: 'Найти материалы и отправить новую заявку',
-        meta: cart.length ? `${cart.length} строк в корзине` : 'Корзина пуста',
-        icon: Home,
-      },
-      {
-        to: '/cabinet#my-requests',
-        title: 'История заявок',
-        caption: 'Посмотреть отправленные заявки и статусы',
-        meta: `${myRequests.length} заявок кабинета`,
-        icon: ClipboardList,
-      },
-    ]
-
     return (
-      <PageTransition className="grid gap-4">
-        <section className="app-panel grid min-h-[360px] content-start gap-3 rounded-lg border p-4">
-          <div>
-            <h2 className="text-xl font-normal text-slate-950">Выберите, с чего начать</h2>
-            <p className="mt-1 text-sm text-slate-500">Главная кабинета</p>
+      <PageTransition respectReducedMotion className="nurse-page nurse-home flex min-h-full">
+        <section className="nurse-home-card flex w-full flex-1 flex-col justify-center overflow-hidden border px-5 py-8 sm:px-9 sm:py-10 lg:px-14 lg:py-12">
+          <div className="flex justify-center">
+            <div className="nurse-home-kicker inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[13px] font-medium">
+              <DoorOpen size={15} className="nurse-home-accent shrink-0" />
+              <span>{room?.title ?? 'Стоматологический кабинет'}</span>
+            </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {dashboardItems.map((item) => {
-              const Icon = item.icon
-
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className="app-soft-card group min-h-[150px] rounded-lg border p-4 transition hover:border-emerald-200 hover:bg-emerald-50/60 hover:shadow-sm"
-                >
-                  <div className="app-soft-card flex h-10 w-10 items-center justify-center rounded-md border text-emerald-800 transition group-hover:border-emerald-200">
-                    <Icon size={20} />
-                  </div>
-                  <div className="mt-4 text-lg font-normal text-slate-950">{item.title}</div>
-                  <div className="mt-1 text-sm leading-5 text-slate-500">{item.caption}</div>
-                  <div className="mt-4 text-xs font-normal uppercase tracking-wide text-slate-400">{item.meta}</div>
-                </Link>
-              )
-            })}
+          <div className="mt-5 text-center">
+            <h1 className="nurse-home-title display-title text-[34px] sm:text-[40px] md:text-[44px]">
+              Кабинет {room?.number ?? '—'}
+            </h1>
+            <p className="nurse-home-muted mx-auto mt-3 max-w-[520px] text-[15px] leading-6">
+              Заявки, статусы и материалы кабинета — в одном месте
+            </p>
           </div>
+
+          <div className="mt-7 flex justify-center">
+            <Link
+              to="/cabinet#request"
+              className="nurse-home-primary inline-flex min-h-[56px] w-full max-w-[420px] items-center justify-center gap-2.5 rounded-[9px] border px-5 text-center text-[18px] font-medium sm:text-[19px]"
+            >
+              <Plus size={19} strokeWidth={2} />
+              Создать новую заявку
+            </Link>
+          </div>
+
+          <div className="nurse-home-latest mx-auto mt-9 w-full max-w-[940px] border-y py-4" role="status">
+            {latestRequest && latestRequestStatus ? (
+              <div className="grid items-center gap-2.5 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+                <span className="nurse-home-muted text-[11px] font-semibold uppercase tracking-[0.08em]">Последняя заявка</span>
+                <div className="nurse-home-kicker min-w-0 truncate text-sm">
+                  <span className="nurse-home-request-id font-semibold">{latestRequest.id}</span>
+                  <span className="nurse-home-separator mx-1.5" aria-hidden="true">·</span>
+                  <span>{formatDateTime(latestRequest.createdAt)}</span>
+                  <span className="nurse-home-separator mx-1.5" aria-hidden="true">·</span>
+                  <span>{latestRequest.createdBy}</span>
+                  <span className="nurse-home-separator mx-1.5" aria-hidden="true">·</span>
+                  <span>{latestRequest.lines.length} позиций</span>
+                  {latestRequestTitle ? (
+                    <>
+                      <span className="nurse-home-separator mx-1.5" aria-hidden="true">·</span>
+                      <span title={latestRequestTitle}>{latestRequestTitle}</span>
+                    </>
+                  ) : null}
+                </div>
+                <StatusPill tone={latestRequestStatus.tone} className="justify-self-start whitespace-nowrap sm:justify-self-end">
+                  {latestRequestStatus.label}
+                </StatusPill>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="nurse-home-muted text-[11px] font-semibold uppercase tracking-[0.08em]">Последняя заявка</span>
+                <span className="nurse-home-muted text-sm">Заявок пока нет</span>
+              </div>
+            )}
+          </div>
+
+          <nav className="mx-auto mt-5 grid w-full max-w-[940px] gap-3 sm:grid-cols-3" aria-label="Быстрые действия">
+            <Link to="/cabinet#my-requests" className="nurse-home-quick-link">
+              <span className="nurse-home-quick-icon">
+                <ClipboardList size={20} />
+              </span>
+              <span className="min-w-0 text-left">
+                <span className="block text-[15px] font-semibold leading-5">История</span>
+                <span className="nurse-home-caption block text-xs font-medium leading-tight">Заявки и статусы</span>
+              </span>
+            </Link>
+            <Link to="/cabinet/materials" className="nurse-home-quick-link">
+              <span className="nurse-home-quick-icon">
+                <BookOpen size={20} />
+              </span>
+              <span className="min-w-0 text-left">
+                <span className="block text-[15px] font-semibold leading-5">Материалы</span>
+                <span className="nurse-home-caption block text-xs font-medium leading-tight">Каталог расходников</span>
+              </span>
+            </Link>
+            <Link to="/cabinet/settings" className="nurse-home-quick-link">
+              <span className="nurse-home-quick-icon">
+                <Settings size={20} />
+              </span>
+              <span className="min-w-0 text-left">
+                <span className="block text-[15px] font-semibold leading-5">Настройки</span>
+                <span className="nurse-home-caption block text-xs font-medium leading-tight">Параметры кабинета</span>
+              </span>
+            </Link>
+          </nav>
         </section>
       </PageTransition>
     )
   }
 
   return (
-    <PageTransition className="h-full min-h-0 overflow-hidden">
+    <PageTransition
+      respectReducedMotion
+      className={cn(
+        'nurse-page h-full min-h-0',
+        isRequestWorkspace ? 'nurse-request-page' : 'overflow-hidden',
+      )}
+    >
       <section className="h-full min-h-0">
-        {location.hash !== '#my-requests' ? (
-          <>
-        <div className="grid h-full min-h-0 gap-2 lg:ml-[194px] xl:grid-cols-[minmax(820px,1fr)_minmax(300px,360px)]">
-          <div className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <div className="grid gap-2 border-b border-slate-200 bg-white p-2.5">
-              <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
-                <div className="min-w-0 shrink-0">
-                  <div className="text-base font-normal text-slate-950">Каталог материалов</div>
-                  <div className="text-xs text-slate-500">Найдено: {catalogDisplayRows.length}</div>
+        {isRequestWorkspace ? (
+        <div
+          ref={requestWorkspaceRef}
+          className="nurse-request-workspace"
+          data-stacked={isRequestStacked}
+          style={{ '--request-cart-width': `${cartPanelWidth}px` } as CSSVariables}
+        >
+          <div className="nurse-catalog-pane">
+            <div className="nurse-catalog-toolbar">
+              <div className="nurse-catalog-toolbar-heading">
+                <div className="min-w-0">
+                  <div className="text-base font-semibold tracking-[-0.01em] text-slate-950">Каталог материалов</div>
+                  <div className="mt-0.5 text-xs text-slate-500">Поиск и выбор позиций для заявки</div>
                 </div>
-                <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-center">
-                  <label className="relative w-full md:w-[420px] xl:w-[520px]">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-                    <input
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      className={`${fieldStyles} h-9 py-1.5 pl-8 text-xs`}
-                      placeholder="Поиск: перчатки, композит, артикаин"
-                    />
-                  </label>
-                  <Button variant="secondary" className="min-h-8 shrink-0 px-2 py-1 text-xs" onClick={() => openManualItem(query)}>
-                    <Plus size={14} />
-                    Позиция не найдена
-                  </Button>
-                </div>
+
               </div>
-              {frequentItems.length ? (
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-xs">
-                  <span className="shrink-0 text-slate-400">Часто:</span>
-                  {frequentItems.map((item) => {
-                    const inCart = cartLineByItem.has(item.id)
 
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => addCatalogToCart(item.id, 1)}
-                        className={cn(
-                          'shrink-0 rounded-md border px-2 py-1 transition',
-                          inCart
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                            : 'border-[#b9decf] bg-white/64 text-[#587367] hover:border-emerald-200 hover:bg-white hover:text-emerald-900',
-                        )}
-                        title={catalogItemProfessionalName(item)}
-                      >
-                        {catalogItemProfessionalName(item)}
-                      </button>
-                    )
-                  })}
+              <div className="nurse-catalog-controls">
+                <label className="nurse-catalog-search">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    className={`${fieldStyles} text-xs`}
+                    placeholder="Поиск по названию"
+                    aria-label="Поиск по каталогу материалов"
+                  />
+                </label>
+
+
+                <div className="nurse-catalog-filter-wrap">
+                  <Button
+                    variant="secondary"
+                    className={cn('nurse-catalog-filter-trigger', activeCatalogFilterCount > 0 && 'is-active')}
+                    onClick={() => setCatalogFiltersOpen((open) => !open)}
+                    aria-expanded={isCatalogFiltersOpen}
+                    aria-haspopup="dialog"
+                  >
+                    <ListFilter size={14} />
+                    Фильтры
+                    {activeCatalogFilterCount > 0 ? <span className="nurse-catalog-filter-count">{activeCatalogFilterCount}</span> : null}
+                    <ChevronDown size={14} className={cn('transition-transform', isCatalogFiltersOpen && 'rotate-180')} />
+                  </Button>
+
+                  {isCatalogFiltersOpen ? (
+                    <div className="nurse-catalog-filter-panel" role="dialog" aria-label="Подробные фильтры каталога">
+                      <div className="nurse-catalog-filter-panel-head">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-950">Фильтры каталога</div>
+                          <div className="text-[11px] text-slate-500">Результаты обновляются сразу</div>
+                        </div>
+                        <button
+                          type="button"
+                          className="nurse-catalog-filter-reset"
+                          onClick={() => {
+                            setCategory('Все')
+                            setCatalogUnit('Все')
+                            setCatalogPositionType('all')
+                            setOnlyRequestItems(false)
+                            setOnlyFavoriteItems(false)
+                          }}
+                          disabled={activeCatalogFilterCount === 0}
+                        >
+                          Сбросить
+                        </button>
+                      </div>
+
+                      <div className="nurse-catalog-filter-section">
+                        <div className="nurse-catalog-filter-label">Направление</div>
+                        <div className="nurse-catalog-filter-options">
+                          <button type="button" className={cn('nurse-catalog-filter-chip', category === 'Все' && 'is-active')} aria-pressed={category === 'Все'} onClick={() => setCategory('Все')}>Все</button>
+                          {clinicalDirections.map((item) => (
+                            <button key={item} type="button" className={cn('nurse-catalog-filter-chip', category === item && 'is-active')} aria-pressed={category === item} onClick={() => setCategory(item)}>
+                              {item}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="nurse-catalog-filter-section">
+                        <div className="nurse-catalog-filter-label">Тип материалов</div>
+                        <div className="nurse-catalog-filter-options">
+                          {materialTypes.map((item) => (
+                            <button key={item} type="button" className={cn('nurse-catalog-filter-chip', category === item && 'is-active')} aria-pressed={category === item} onClick={() => setCategory(item)}>
+                              {item}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="nurse-catalog-filter-grid">
+                        <div className="nurse-catalog-filter-section">
+                          <div className="nurse-catalog-filter-label">Структура позиции</div>
+                          <div className="nurse-catalog-filter-options">
+                            {([
+                              ['all', 'Любая'],
+                              ['grouped', 'С вариантами'],
+                              ['single', 'Одиночная'],
+                            ] as const).map(([value, label]) => (
+                              <button key={value} type="button" className={cn('nurse-catalog-filter-chip', catalogPositionType === value && 'is-active')} aria-pressed={catalogPositionType === value} onClick={() => setCatalogPositionType(value)}>
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="nurse-catalog-filter-section">
+                          <div className="nurse-catalog-filter-label">Единица выдачи</div>
+                          <div className="nurse-catalog-filter-options">
+                            {catalogUnits.map((item) => (
+                              <button key={item} type="button" className={cn('nurse-catalog-filter-chip', catalogUnit === item && 'is-active')} aria-pressed={catalogUnit === item} onClick={() => setCatalogUnit(item)}>
+                                {item}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <label className="nurse-catalog-request-toggle">
+                        <input type="checkbox" checked={onlyRequestItems} onChange={(event) => setOnlyRequestItems(event.target.checked)} />
+                        <span>
+                          <strong>Только позиции в заявке</strong>
+                          <small>Показать уже выбранные материалы</small>
+                        </span>
+                      </label>
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
-              <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-                {categories.map((item) => {
-                  const active = category === item
 
-                  return (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => setCategory(item)}
-                      className={cn(
-                        'shrink-0 rounded-full border px-3 py-1.5 text-xs font-normal transition',
-                        active
-                          ? 'border-emerald-700 bg-emerald-700 text-white shadow-sm'
-                          : 'border-[#b9decf] bg-white/64 text-[#587367] hover:border-emerald-200 hover:bg-white hover:text-emerald-900',
-                      )}
-                    >
-                      {item}
-                    </button>
-                  )
-                })}
+                <button
+                  type="button"
+                  className={cn('nurse-catalog-quick-filter', onlyFavoriteItems && 'is-active')}
+                  aria-pressed={onlyFavoriteItems}
+                  onClick={() => setOnlyFavoriteItems((active) => !active)}
+                >
+                  <Star size={17} fill={onlyFavoriteItems ? 'currentColor' : 'none'} />
+                  Избранное
+                  {favoriteCatalogItemIds.size > 0 ? <span className="nurse-catalog-favorite-count">{favoriteCatalogItemIds.size}</span> : null}
+                </button>
+
+                <button type="button" className="nurse-catalog-manual" onClick={() => openManualItem(query)}>
+                  <Plus size={16} />
+                  Позиция не найдена
+                </button>
               </div>
             </div>
-            <div className="h-full min-h-0 overflow-x-hidden overflow-y-auto">
-              <table className="w-full table-fixed border-separate border-spacing-0">
+            <TableViewport label="Каталог материалов" className="nurse-catalog-scroll">
+              <table className="nurse-catalog-table">
                 <colgroup>
-                  <col className="w-[4%]" />
-                  <col className="w-[60%]" />
-                  <col className="w-[24%]" />
-                  <col className="w-[12%]" />
+                  <col className="nurse-col-index" />
+                  <col />
+                  <col className="nurse-col-direction" />
+                  <col className="nurse-col-category" />
+                  <col className="nurse-col-unit" />
+                  <col className="nurse-col-action" />
                 </colgroup>
               <thead>
                 <tr>
                   <th className={cn(requestTableHeaderCell, '!px-1 !text-center')}>№</th>
                   <th className={requestTableHeaderCell}>Наименование</th>
-                  <th className={requestTableHeaderCell}>Детали</th>
+                  <th className={requestTableHeaderCell}>Направление</th>
+                  <th className={requestTableHeaderCell}>Категория</th>
+                  <th className={cn(requestTableHeaderCell, '!text-center')}>Ед.</th>
                   <th className={cn(requestTableHeaderCell, '!px-1 !text-center')}>Действие</th>
                 </tr>
               </thead>
@@ -1079,11 +1473,12 @@ export function NurseCabinetPage() {
                     if (row.type === 'group') {
                       const expanded = Boolean(expandedGroupIds[row.group.id])
                       const selectedCount = row.items.filter((item) => cartLineByItem.has(item.id)).length
+                      const favorite = row.items.every((item) => favoriteCatalogItemIds.has(item.id))
 
                       return (
                         <tr
                           key={row.group.id}
-                          className="cursor-pointer border-b border-slate-100 bg-slate-50/45 transition hover:bg-slate-100/70"
+                          className="nurse-catalog-group-row cursor-pointer transition"
                           onClick={() => toggleCatalogGroup(row.group.id)}
                         >
                           <td className={cn(requestTableCell, '!px-1 text-center text-xs text-slate-500')}>{index + 1}</td>
@@ -1092,6 +1487,7 @@ export function NurseCabinetPage() {
                               <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm">
                                 {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                               </span>
+
                               <div className="min-w-0">
                                 <div className="font-normal text-slate-950">{row.group.title}</div>
                                 <div className="mt-0.5 text-[11px] text-slate-500">
@@ -1101,21 +1497,25 @@ export function NurseCabinetPage() {
                               </div>
                             </div>
                           </td>
-                          <td className={requestTableCell}>
-                            <div className="text-slate-700">{getGroupCategoryLabel(row.items)}</div>
-                            <div className="mt-0.5 text-[11px] leading-4 text-slate-500">{row.totalVariants} варианта для выбора</div>
-                          </td>
+                          <td className={requestTableCell}>{getGroupDirectionLabel(row.items)}</td>
+                          <td className={requestTableCell}>{getGroupCategoryLabel(row.items)}</td>
+                          <td className={cn(requestTableCell, 'text-center')}>{getGroupUnitLabel(row.items)}</td>
                           <td className={cn(requestTableCell, '!px-1 text-center')}>
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                toggleCatalogGroup(row.group.id)
-                              }}
-                              className="inline-flex min-h-6 items-center justify-center rounded-md border border-slate-200 bg-white px-2 text-xs font-normal text-slate-700 transition hover:bg-slate-50"
-                            >
-                              {expanded ? 'Свернуть' : 'Варианты'}
-                            </button>
+                            <div className="nurse-catalog-row-actions nurse-catalog-row-actions--favorite-only">
+
+                              <button
+                                type="button"
+                                className={cn('nurse-catalog-favorite-toggle', favorite && 'is-active')}
+                                aria-label={favorite ? `Убрать группу из избранного: ${row.group.title}` : `Добавить группу в избранное: ${row.group.title}`}
+                                aria-pressed={favorite}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  toggleFavoriteCatalogItems(row.items.map((item) => item.id))
+                                }}
+                              >
+                                <Star size={16} fill={favorite ? 'currentColor' : 'none'} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       )
@@ -1137,29 +1537,48 @@ export function NurseCabinetPage() {
                         <td className={cn(requestTableCell, '!px-1 text-center text-xs text-slate-500')}>{row.nested ? '' : index + 1}</td>
                         <td className={cn(requestTableCell, 'min-w-0')}>
                           <div className={cn('flex min-w-0 items-start gap-1.5', row.nested && 'pl-7')}>
+
                             <div className="min-w-0 flex-1">
                               <div className="whitespace-normal break-words font-normal text-slate-950" title={catalogItemProfessionalName(item)}>
                                 {catalogItemProfessionalName(item)}
                               </div>
-                              <div className="mt-0.5 text-[11px] leading-4 text-slate-500">{item.category} · ед.: {item.unit}</div>
+
                             </div>
                           </div>
                         </td>
-                        <td className={requestTableCell}>{item.packageLabel}</td>
-                        <td className={cn(requestTableCell, '!px-1 whitespace-nowrap text-center')}>{renderCatalogItemAction(item)}</td>
+                        <td className={requestTableCell}>{catalogDirectionLabel(item)}</td>
+                        <td className={requestTableCell}>{item.category}</td>
+                        <td className={cn(requestTableCell, 'text-center')}>{item.unit}</td>
+                        <td className={cn(requestTableCell, '!px-1 whitespace-nowrap text-center')}>
+                          <div className="nurse-catalog-row-actions">
+                            {renderCatalogItemAction(item)}
+                            <button
+                              type="button"
+                              className={cn('nurse-catalog-favorite-toggle', favoriteCatalogItemIds.has(item.id) && 'is-active')}
+                              aria-label={favoriteCatalogItemIds.has(item.id) ? `Убрать из избранного: ${catalogItemProfessionalName(item)}` : `Добавить в избранное: ${catalogItemProfessionalName(item)}`}
+                              aria-pressed={favoriteCatalogItemIds.has(item.id)}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                toggleFavoriteCatalogItem(item.id)
+                              }}
+                            >
+                              <Star size={16} fill={favoriteCatalogItemIds.has(item.id) ? 'currentColor' : 'none'} />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableViewport>
 
             {!catalogDisplayRows.length ? (
               <EmptyState className="m-3">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <span>По этим фильтрам позиций нет.</span>
                   {query.trim() ? (
-                    <Button variant="secondary" className="min-h-8 shrink-0 px-2 py-1 text-xs" onClick={() => openManualItem(query)}>
+                    <Button variant="secondary" className="shrink-0 px-2 text-xs" onClick={() => openManualItem(query)}>
                       <Plus size={14} />
                       Добавить как ручную
                     </Button>
@@ -1169,10 +1588,37 @@ export function NurseCabinetPage() {
             ) : null}
           </div>
 
-          <aside className="h-full min-h-0 min-w-0">
+          <button
+            type="button"
+            role="separator"
+            aria-label="Изменить ширину заявки"
+            aria-orientation="vertical"
+            aria-valuemin={requestCartMinimumWidth}
+            aria-valuemax={getRequestCartMaximumWidth(requestWorkspaceWidth)}
+            aria-valuenow={cartPanelWidth}
+            aria-valuetext={`Ширина корзины ${cartPanelWidth} пикселей`}
+            tabIndex={0}
+            title="Перетащите влево, чтобы увеличить заявку"
+            onPointerDown={handleCartResizeStart}
+            onPointerMove={handleCartResizeMove}
+            onPointerUp={(event) => finishCartResize(event.pointerId)}
+            onPointerCancel={(event) => finishCartResize(event.pointerId)}
+            onLostPointerCapture={(event) => finishCartResize(event.pointerId)}
+            onKeyDown={handleCartResizeKeyDown}
+            className="nurse-request-resizer"
+          >
+            <span className="nurse-request-resizer-mark" aria-hidden="true" />
+          </button>
+
+          <aside
+            className="nurse-cart-panel"
+          >
             <RequestCart
               cart={cart}
               catalog={catalog}
+              room={room}
+              responsibleNurse={responsibleNurse}
+              onResponsibleNurseChange={setResponsibleNurse}
               onUpdate={updateCartLine}
               onRemove={removeCartLine}
               onSubmit={openRequestPreview}
@@ -1180,7 +1626,6 @@ export function NurseCabinetPage() {
             />
           </aside>
         </div>
-          </>
         ) : null}
 
         {location.hash === '#my-requests' ? (
@@ -1189,14 +1634,14 @@ export function NurseCabinetPage() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 {selectedHistoryRequest ? (
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
                     onClick={() => setSelectedHistoryRequestId(null)}
-                    className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 transition hover:bg-slate-50"
+                    className="px-2 text-xs"
                   >
                     <ArrowLeft size={14} />
                     К списку
-                  </button>
+                  </Button>
                 ) : null}
                 <div className="text-lg font-normal text-slate-950">
                   {selectedHistoryRequest ? requestDisplayTitle(selectedHistoryRequest, catalog, room) : 'Мои заявки'}
@@ -1204,16 +1649,17 @@ export function NurseCabinetPage() {
               </div>
               <div className="mt-1 text-sm text-slate-500">
                 {selectedHistoryRequest
-                  ? `${formatDateTime(selectedHistoryRequest.createdAt)} · ${selectedHistoryRequest.lines.length} позиций`
+                  ? `${formatDateTime(selectedHistoryRequest.createdAt)} · Ответственная: ${selectedHistoryRequest.createdBy} · ${selectedHistoryRequest.lines.length} позиций`
                   : `История кабинета ${room?.number}`}
               </div>
             </div>
           </div>
 
-          <div className="min-h-0 overflow-auto p-3">
+          <div className="min-h-0 overflow-x-hidden overflow-y-auto p-3">
             {selectedHistoryRequest ? (
-              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-                <table className="w-full table-fixed border-separate border-spacing-0">
+              <TableFrame>
+                <TableViewport label="Состав выбранной заявки">
+                <table className="w-full min-w-[980px] table-fixed border-separate border-spacing-0">
                   <colgroup>
                     <col className="w-[4%]" />
                     <col className="w-[34%]" />
@@ -1243,7 +1689,11 @@ export function NurseCabinetPage() {
                       const lineIssueStatus = requestLineIssueStatus(line, isProcessed)
 
                       return (
-                        <tr key={line.id} className={cn(index % 2 ? 'bg-white' : 'bg-slate-50/35', lineIssueStatus.rowClassName)}>
+                        <tr
+                          key={line.id}
+                          className={cn('workspace-status-row', index % 2 ? 'bg-white' : 'bg-slate-50/35')}
+                          data-tone={lineIssueStatus.tone}
+                        >
                           <td className={cn(requestTableCell, '!px-1 text-center text-slate-500')}>{index + 1}</td>
                           <td className={requestTableCell}>
                             <div className="whitespace-normal break-words font-normal text-slate-950" title={item?.fullName ?? line.manualName}>
@@ -1266,21 +1716,25 @@ export function NurseCabinetPage() {
                     })}
                   </tbody>
                 </table>
-              </div>
+                </TableViewport>
+              </TableFrame>
             ) : (
-              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-                <table className="w-full table-fixed border-separate border-spacing-0">
+              <TableFrame>
+                <TableViewport label="История заявок кабинета">
+                <table className="w-full min-w-[980px] table-fixed border-separate border-spacing-0">
                   <colgroup>
-                    <col className="w-[38%]" />
-                    <col className="w-[15%]" />
-                    <col className="w-[14%]" />
-                    <col className="w-[16%]" />
-                    <col className="w-[9%]" />
-                    <col className="w-[8%]" />
+                    <col className="w-[27%]" />
+                    <col className="w-[19%]" />
+                    <col className="w-[13%]" />
+                    <col className="w-[11%]" />
+                    <col className="w-[13%]" />
+                    <col className="w-[7%]" />
+                    <col className="w-[10%]" />
                   </colgroup>
                   <thead>
                     <tr>
                       <th className={requestTableHeaderCell}>Название заявки</th>
+                      <th className={requestTableHeaderCell}>Ответственная</th>
                       <th className={cn(requestTableHeaderCell, '!text-center')}>Дата</th>
                       <th className={cn(requestTableHeaderCell, '!text-center')}>Статус</th>
                       <th className={cn(requestTableHeaderCell, '!text-center')}>Выдача</th>
@@ -1303,6 +1757,9 @@ export function NurseCabinetPage() {
                               {requestDisplayTitle(request, catalog, room)}
                             </div>
                           </td>
+                          <td className={requestTableCell}>
+                            <div className="truncate text-slate-950" title={request.createdBy}>{request.createdBy}</div>
+                          </td>
                           <td className={cn(requestTableCell, 'text-center')}>{formatDateTime(request.createdAt)}</td>
                           <td className={requestTableCell}>
                             <div className="flex justify-center">
@@ -1316,16 +1773,16 @@ export function NurseCabinetPage() {
                           </td>
                           <td className={cn(requestTableCell, 'text-center text-slate-950')}>{request.lines.length}</td>
                           <td className={cn(requestTableCell, '!px-1 text-center')}>
-                            <button
-                              type="button"
+                            <Button
+                              variant="secondary"
                               onClick={(event) => {
                                 event.stopPropagation()
                                 setSelectedHistoryRequestId(request.id)
                               }}
-                              className="inline-flex min-h-6 items-center justify-center rounded-md border border-slate-200 bg-white px-2 text-xs font-normal text-slate-700 transition hover:bg-slate-50"
+                              className="px-2 text-xs"
                             >
                               Открыть
-                            </button>
+                            </Button>
                           </td>
                         </tr>
                       )
@@ -1333,43 +1790,40 @@ export function NurseCabinetPage() {
                   </tbody>
                 </table>
                 {!myRequests.length ? <EmptyState className="m-3">Заявок кабинета пока нет.</EmptyState> : null}
-              </div>
+                </TableViewport>
+              </TableFrame>
             )}
           </div>
         </Panel>
         ) : null}
       </section>
       {isManualOpen ? (
-        <ModalPortal>
-          <ManualItemModal
-            key={manualInitialName || 'empty-manual-item'}
-            initialName={manualInitialName}
-            onClose={() => setManualOpen(false)}
-            onAdd={(name, quantity, comment) => addManualLineToCart(name, quantity, comment)}
-          />
-        </ModalPortal>
+        <ManualItemWorkspaceDialog
+          key={manualInitialName || 'empty-manual-item'}
+          initialName={manualInitialName}
+          onClose={() => setManualOpen(false)}
+          onAdd={(name, quantity, comment) => addManualLineToCart(name, quantity, comment)}
+        />
       ) : null}
       {isPreviewOpen ? (
-        <ModalPortal>
-          <RequestPreviewModal
-            cart={cart}
-            catalog={catalog}
-            room={room}
-            comment={previewComment}
-            onClose={() => setPreviewOpen(false)}
-            onConfirm={confirmRequestSubmit}
-          />
-        </ModalPortal>
+        <RequestPreviewWorkspaceDialog
+          cart={cart}
+          catalog={catalog}
+          room={room}
+          responsibleName={previewResponsibleNurse}
+          comment={previewComment}
+          onClose={() => setPreviewOpen(false)}
+          onConfirm={confirmRequestSubmit}
+        />
       ) : null}
       {isSubmitLoading ? (
-        <ModalPortal>
-          <BrandedLoadingModal title="Формируем заявку" durationSeconds={submitLoadingMs / 1000} />
-        </ModalPortal>
+        <RequestSubmitLoadingDialog
+          durationSeconds={submitLoadingMs / 1000}
+          onClose={cancelRequestSubmit}
+        />
       ) : null}
       {isSubmitDoneOpen ? (
-        <ModalPortal>
-          <RequestSubmitDoneModal onClose={() => setSubmitDoneOpen(false)} />
-        </ModalPortal>
+        <RequestSubmitDoneWorkspaceDialog onClose={() => setSubmitDoneOpen(false)} />
       ) : null}
     </PageTransition>
   )

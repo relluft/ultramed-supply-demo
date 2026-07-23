@@ -1,9 +1,10 @@
 import { ClipboardList } from 'lucide-react'
 import { PageTransition } from '../components/PageTransition'
 import { EmptyState, Panel, SectionHeader, StatusPill } from '../components/ui'
+import { StatusBadge, Surface } from '../components/workspace-v2'
 import { useDemo } from '../context'
-import { roleLabels } from '../lib/demoLogic'
-import { formatDateTime } from '../lib/format'
+import { roleLabels, roleToRoomId } from '../lib/demoLogic'
+import { cn, formatDateTime } from '../lib/format'
 
 const eventLabels: Record<string, string> = {
   'request-created': 'Заявка создана',
@@ -22,32 +23,67 @@ const eventLabels: Record<string, string> = {
   'clarification-needed': 'Нужно уточнение',
 }
 
-export function JournalPage() {
+export function JournalPage({ uiMode = 'legacy' }: { uiMode?: 'legacy' | 'workspace-v2' }) {
   const {
-    state: { journal, catalog, rooms },
+    state: { journal, catalog, rooms, role },
   } = useDemo()
+  const isWorkspaceV2 = uiMode === 'workspace-v2'
+  const PanelView = isWorkspaceV2 ? Surface : Panel
+  const StatusView = isWorkspaceV2 ? StatusBadge : StatusPill
+  const roomId = isWorkspaceV2 ? roleToRoomId(role) : undefined
+  const room = roomId ? rooms.find((candidate) => candidate.id === roomId) : undefined
+  const isNurseJournal = isWorkspaceV2 && Boolean(roomId)
+  const visibleEvents = isNurseJournal
+    ? journal
+        .filter((event) => event.roomId === roomId)
+        .sort(
+          (left, right) =>
+            new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+        )
+    : journal
+  const subtitle = isNurseJournal
+    ? `История действий и изменений, относящихся к кабинету ${room?.number ?? ''}.`
+    : 'События демо-контура: заявки, выдача, пополнение, поставщики, заказы и приход.'
 
   return (
-    <PageTransition className="grid gap-4">
-      <Panel>
-        <SectionHeader title="Журнал" subtitle="События демо-контура: заявки, выдача, пополнение, поставщики, заказы и приход." />
-      </Panel>
+    <PageTransition
+      respectReducedMotion={isWorkspaceV2}
+      className={isWorkspaceV2 ? 'nurse-page grid gap-4' : 'grid gap-4'}
+    >
+      <PanelView className={isWorkspaceV2 ? 'p-[var(--ui-panel-padding)]' : undefined}>
+        <SectionHeader title={isNurseJournal ? `Журнал кабинета ${room?.number ?? ''}` : 'Журнал'} subtitle={subtitle} />
+      </PanelView>
 
-      <Panel>
+      <PanelView className={isWorkspaceV2 ? 'p-[var(--ui-panel-padding)]' : undefined}>
         <div className="flex items-center justify-between gap-3">
           <div className="text-lg font-semibold text-slate-950">События</div>
-          <StatusPill tone="info">{journal.length}</StatusPill>
+          <StatusView tone="info">{visibleEvents.length}</StatusView>
         </div>
 
         <div className="mt-4 grid gap-2">
-          {journal.length ? (
-            journal.map((event) => {
+          {visibleEvents.length ? (
+            visibleEvents.map((event) => {
               const item = event.itemId ? catalog.find((candidate) => candidate.id === event.itemId) : undefined
               const room = event.roomId ? rooms.find((candidate) => candidate.id === event.roomId) : undefined
               return (
-                <div key={event.id} className="app-soft-card grid gap-3 rounded-md border p-3 md:grid-cols-[180px,minmax(0,1fr),180px]">
+                <div
+                  key={event.id}
+                  className={cn(
+                    'grid gap-3 rounded-md border p-3 md:grid-cols-[180px,minmax(0,1fr),180px]',
+                    isWorkspaceV2
+                      ? 'workspace-surface p-[var(--ui-panel-padding)]'
+                      : 'app-soft-card',
+                  )}
+                  data-surface={isWorkspaceV2 ? 'raised' : undefined}
+                >
                   <div className="flex items-start gap-2">
-                    <div className="app-soft-card flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-emerald-700">
+                    <div
+                      className={cn(
+                        'flex shrink-0 items-center justify-center rounded-md text-emerald-700',
+                        isWorkspaceV2 ? 'workspace-surface h-10 w-10' : 'app-soft-card h-8 w-8',
+                      )}
+                      data-surface={isWorkspaceV2 ? 'panel' : undefined}
+                    >
                       <ClipboardList size={16} />
                     </div>
                     <div>
@@ -59,9 +95,9 @@ export function JournalPage() {
                     <div className="font-semibold text-slate-950">{event.title}</div>
                     <div className="mt-1 text-sm leading-6 text-slate-600">{event.description}</div>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <StatusPill>{eventLabels[event.type]}</StatusPill>
-                      {item ? <StatusPill tone="info">{item.shortName}</StatusPill> : null}
-                      {room ? <StatusPill tone="neutral">Кабинет {room.number}</StatusPill> : null}
+                      <StatusView>{eventLabels[event.type]}</StatusView>
+                      {item ? <StatusView tone="info">{item.shortName}</StatusView> : null}
+                      {room ? <StatusView tone="neutral">Кабинет {room.number}</StatusView> : null}
                     </div>
                   </div>
                   <div className="text-sm text-slate-500">
@@ -72,10 +108,14 @@ export function JournalPage() {
               )
             })
           ) : (
-            <EmptyState>События появятся после действий в демо.</EmptyState>
+            <EmptyState>
+              {isNurseJournal
+                ? 'Действия этого кабинета появятся здесь после работы в системе.'
+                : 'События появятся после действий в демо.'}
+            </EmptyState>
           )}
         </div>
-      </Panel>
+      </PanelView>
     </PageTransition>
   )
 }

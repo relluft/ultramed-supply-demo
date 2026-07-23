@@ -1,16 +1,20 @@
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import type { PropsWithChildren } from 'react'
 
 export function PageTransition({
   children,
   className = '',
-}: PropsWithChildren<{ className?: string }>) {
+  respectReducedMotion = false,
+}: PropsWithChildren<{ className?: string; respectReducedMotion?: boolean }>) {
+  const prefersReducedMotion = useReducedMotion()
+  const reduceMotion = respectReducedMotion && prefersReducedMotion
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.22, ease: 'easeOut' }}
+      exit={reduceMotion ? undefined : { opacity: 0, y: -8 }}
+      transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: 'easeOut' }}
       className={className}
     >
       {children}

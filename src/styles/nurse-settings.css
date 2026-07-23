@@ -1,0 +1,303 @@
+﻿[data-ui-mode="workspace-v2"] .nurse-settings-page {
+  min-height: 100%;
+  background: radial-gradient(circle at 84% 6%, rgba(190, 235, 217, 0.32), transparent 28rem), var(--workspace-page);
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-container {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: clamp(24px, 3vw, 42px);
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-page__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-eyebrow {
+  margin: 0 0 5px;
+  color: var(--workspace-accent);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-page__header h1 {
+  margin: 0;
+  color: var(--workspace-text-strong);
+  font-size: clamp(28px, 3vw, 36px);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-lead {
+  max-width: 650px;
+  margin: 9px 0 0;
+  color: var(--workspace-text-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-save-state {
+  display: inline-flex;
+  min-width: max-content;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #b8d9cb;
+  border-radius: 999px;
+  padding: 7px 11px;
+  color: #176b4e;
+  background: rgba(238, 249, 244, 0.92);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  align-items: start;
+  gap: 20px;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-main,
+[data-ui-mode="workspace-v2"] .nurse-settings-aside {
+  display: grid;
+  gap: 16px;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-section { overflow: hidden; }
+
+[data-ui-mode="workspace-v2"] .nurse-settings-section__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border-bottom: 1px solid var(--workspace-border);
+  padding: 18px 20px 16px;
+  background: linear-gradient(105deg, #f7fbf9, #fff 72%);
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-section__icon {
+  display: inline-grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--workspace-accent);
+  background: var(--workspace-accent-soft);
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-section h2,
+[data-ui-mode="workspace-v2"] .nurse-settings-note h2,
+[data-ui-mode="workspace-v2"] .nurse-settings-help h2 {
+  margin: 0;
+  color: var(--workspace-text-strong);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-section__header p {
+  margin: 3px 0 0;
+  color: var(--workspace-text-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-section__body { padding: 0 20px; }
+
+[data-ui-mode="workspace-v2"] .nurse-settings-row {
+  position: relative;
+  display: grid;
+  min-height: 76px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 22px;
+  border-bottom: 1px solid #e7eeea;
+  cursor: pointer;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-section__body > .nurse-settings-row:last-child,
+[data-ui-mode="workspace-v2"] .nurse-settings-sound-row > .nurse-settings-row { border-bottom: 0; }
+
+[data-ui-mode="workspace-v2"] .nurse-settings-row__label {
+  display: block;
+  color: var(--workspace-text-strong);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-row__description {
+  display: block;
+  margin-top: 3px;
+  color: var(--workspace-text-muted);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-switch__input {
+  position: absolute;
+  right: 0;
+  width: 44px;
+  height: 24px;
+  margin: 0;
+  opacity: 0;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex: 0 0 44px;
+  border: 1px solid #aab8b2;
+  border-radius: 999px;
+  background: #dce4e0;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-switch > span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(18, 45, 36, 0.24);
+  transition: transform 150ms ease;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-switch__input:checked + .nurse-settings-switch {
+  border-color: var(--workspace-accent);
+  background: var(--workspace-accent);
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-switch__input:checked + .nurse-settings-switch > span { transform: translateX(20px); }
+
+[data-ui-mode="workspace-v2"] .nurse-settings-switch__input:focus-visible + .nurse-settings-switch {
+  outline: 2px solid var(--workspace-focus);
+  outline-offset: 2px;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-density {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 42%);
+  align-items: center;
+  gap: 22px;
+  padding: 17px 0 19px;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-density .nurse-density-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-sound-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-sound-row .nurse-settings-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding-right: 18px;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-sound-test { min-width: 142px; }
+
+[data-ui-mode="workspace-v2"] .nurse-settings-profile,
+[data-ui-mode="workspace-v2"] .nurse-settings-note,
+[data-ui-mode="workspace-v2"] .nurse-settings-help { padding: 18px; }
+
+[data-ui-mode="workspace-v2"] .nurse-settings-profile {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-profile__avatar {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 50%;
+  color: #2d6555;
+  background: #edf5f1;
+  box-shadow: inset 0 0 0 1px #d6e4de;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-profile__caption { color: var(--workspace-text-muted); font-size: 11px; }
+[data-ui-mode="workspace-v2"] .nurse-settings-profile__title { margin-top: 2px; color: var(--workspace-text-strong); font-size: 17px; font-weight: 720; }
+[data-ui-mode="workspace-v2"] .nurse-settings-profile__subtitle { margin-top: 1px; color: var(--workspace-text-muted); font-size: 12px; }
+
+[data-ui-mode="workspace-v2"] .nurse-settings-profile__meta {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 7px;
+  border-top: 1px solid var(--workspace-border);
+  margin-top: 5px;
+  padding-top: 13px;
+  color: #42645a;
+  font-size: 12px;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-note,
+[data-ui-mode="workspace-v2"] .nurse-settings-help { display: flex; align-items: flex-start; gap: 11px; }
+[data-ui-mode="workspace-v2"] .nurse-settings-note { border-color: #c9dfd6; background: #f5fbf8; }
+[data-ui-mode="workspace-v2"] .nurse-settings-note__icon { color: var(--workspace-accent); }
+
+[data-ui-mode="workspace-v2"] .nurse-settings-note p,
+[data-ui-mode="workspace-v2"] .nurse-settings-help p {
+  margin: 5px 0 0;
+  color: var(--workspace-text-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-help > svg { flex: 0 0 auto; color: #587168; }
+
+html[data-nurse-contrast="high"] [data-ui-mode="workspace-v2"] {
+  --workspace-text: #08261d;
+  --workspace-text-strong: #001c14;
+  --workspace-text-muted: #344d44;
+  --workspace-border: #9bafa6;
+  --workspace-border-strong: #657d73;
+  --workspace-nav-text: #243c34;
+}
+
+html[data-nurse-motion="reduced"] [data-ui-mode="workspace-v2"] *,
+html[data-nurse-motion="reduced"] [data-ui-mode="workspace-v2"] *::before,
+html[data-nurse-motion="reduced"] [data-ui-mode="workspace-v2"] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+@media (max-width: 980px) {
+  [data-ui-mode="workspace-v2"] .nurse-settings-layout { grid-template-columns: minmax(0, 1fr); }
+  [data-ui-mode="workspace-v2"] .nurse-settings-aside { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-ui-mode="workspace-v2"] .nurse-settings-profile { grid-row: span 2; }
+}
+
+@media (max-width: 720px) {
+  [data-ui-mode="workspace-v2"] .nurse-settings-container { padding: 20px 16px 28px; }
+  [data-ui-mode="workspace-v2"] .nurse-settings-page__header { align-items: flex-start; flex-direction: column; gap: 13px; }
+  [data-ui-mode="workspace-v2"] .nurse-settings-density,
+  [data-ui-mode="workspace-v2"] .nurse-settings-sound-row { grid-template-columns: minmax(0, 1fr); }
+  [data-ui-mode="workspace-v2"] .nurse-settings-sound-row .nurse-settings-row { padding-right: 0; }
+  [data-ui-mode="workspace-v2"] .nurse-settings-sound-test { width: 100%; margin-bottom: 16px; }
+  [data-ui-mode="workspace-v2"] .nurse-settings-aside { grid-template-columns: minmax(0, 1fr); }
+}

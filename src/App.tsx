@@ -1,12 +1,14 @@
 import { useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppLayout } from './components/AppLayout'
+import { NurseAppLayout } from './components/NurseAppLayout'
 import { ZoomControl } from './components/ZoomControl'
 import { DemoProvider, useDemo } from './context'
 import { AnalyticsPage } from './pages/AnalyticsPage'
 import { CatalogPage } from './pages/CatalogPage'
 import { JournalPage } from './pages/JournalPage'
 import { NurseCabinetPage } from './pages/NurseCabinetPage'
+import { NurseSettingsPage } from './pages/NurseSettingsPage'
 import { ReceiptPage } from './pages/ReceiptPage'
 import { ReplenishmentPage } from './pages/ReplenishmentPage'
 import { SeniorWorkspacePage } from './pages/SeniorWorkspacePage'
@@ -37,13 +39,15 @@ function RequireNurse({ children }: { children: ReactNode }) {
     setRole,
   } = useDemo()
 
+  const isNurse = role.startsWith('nurse-')
+
   useEffect(() => {
-    if (role !== 'nurse-105') {
+    if (!isNurse) {
       setRole('nurse-105')
     }
-  }, [role, setRole])
+  }, [isNurse, setRole])
 
-  if (role !== 'nurse-105') return null
+  if (!isNurse) return null
 
   return children
 }
@@ -55,7 +59,31 @@ function AnimatedRoutes() {
     <Routes location={location}>
       <Route index element={<StartPage />} />
 
-      <Route element={<AppLayout />}>
+      <Route element={<NurseAppLayout />}>
+        <Route
+          path="/cabinet/journal"
+          element={
+            <RequireNurse>
+              <JournalPage uiMode="workspace-v2" />
+            </RequireNurse>
+          }
+        />
+        <Route
+          path="/cabinet/materials"
+          element={
+            <RequireNurse>
+              <CatalogPage readOnly uiMode="workspace-v2" />
+            </RequireNurse>
+          }
+        />
+        <Route
+          path="/cabinet/settings"
+          element={
+            <RequireNurse>
+              <NurseSettingsPage />
+            </RequireNurse>
+          }
+        />
         <Route
           path="/cabinet"
           element={
@@ -64,6 +92,9 @@ function AnimatedRoutes() {
             </RequireNurse>
           }
         />
+      </Route>
+
+      <Route element={<AppLayout />}>
         <Route
           path="/senior"
           element={
@@ -151,12 +182,20 @@ function AnimatedRoutes() {
   )
 }
 
+function LegacyZoomBoundary() {
+  const location = useLocation()
+  const isNurseRoute =
+    location.pathname === '/cabinet' || location.pathname.startsWith('/cabinet/')
+
+  return isNurseRoute ? null : <ZoomControl />
+}
+
 function App() {
   return (
     <DemoProvider>
       <BrowserRouter>
         <AnimatedRoutes />
-        <ZoomControl />
+        <LegacyZoomBoundary />
       </BrowserRouter>
     </DemoProvider>
   )

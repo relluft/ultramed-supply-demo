@@ -50,7 +50,7 @@ export function RoleSwitcher({
             )}
           >
             <Icon size={15} />
-            {compact ? roleLabels[item].replace('Кабинет ', 'Каб. ').replace('Старшая медсестра', 'Старшая') : roleLabels[item]}
+            {compact ? roleLabels[item].replace('Кабинет ', 'Каб. ').replace('Главная мед. сестра', 'Главная') : roleLabels[item]}
           </button>
         )
       })}

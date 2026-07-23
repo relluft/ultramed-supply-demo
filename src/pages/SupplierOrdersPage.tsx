@@ -1,8 +1,7 @@
-import { ChevronDown, ChevronRight, Download, FileSpreadsheet, Truck } from 'lucide-react'
+import { ChevronDown, ChevronRight, Download, FileSpreadsheet } from 'lucide-react'
 import { Fragment, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { PageTransition } from '../components/PageTransition'
-import { Button, Panel, SectionHeader } from '../components/ui'
+import { Panel, SectionHeader } from '../components/ui'
 import { useDemo } from '../context'
 import { availabilityLabels, orderStatusLabels } from '../lib/demoLogic'
 import { cn, formatDateTime, formatMoney, formatNumber } from '../lib/format'
@@ -35,7 +34,6 @@ function downloadExcelFile(fileName: string, html: string) {
 }
 
 export function SupplierOrdersPage() {
-  const navigate = useNavigate()
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null)
   const {
     state: { orders, suppliers, catalog },
@@ -153,12 +151,6 @@ export function SupplierOrdersPage() {
         <SectionHeader
           title="Заказы поставщикам"
           subtitle="Реестр сформированных заказов."
-          action={
-            <Button onClick={() => navigate('/replenishment')}>
-              К пополнению
-              <Truck size={16} />
-            </Button>
-          }
         />
       </Panel>
 

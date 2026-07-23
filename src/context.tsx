@@ -32,6 +32,7 @@ import type {
 } from './types/demo'
 
 const storageKey = 'ultramed-supply-demo-state'
+const mockDataRevision = 'journal-cabinet-v2'
 const legacyStorageKeys = [
   'ultramed-supply-demo-state-v29',
   'ultramed-supply-demo-state-v28',
@@ -41,6 +42,15 @@ const legacyStorageKeys = [
 ]
 const orthodonticDemoRequestId = 'REQ-005'
 const initialMockRequests = mockRequests.filter((request) => request.id !== orthodonticDemoRequestId)
+const refreshedIssuedMockRequestIds = new Set([
+  'REQ-006',
+  'REQ-009',
+  'REQ-010',
+  'REQ-012',
+  'REQ-013',
+  'REQ-014',
+  'REQ-015',
+])
 const orthodonticDemoQuantityByItemId = new Map(
   (mockRequests.find((request) => request.id === orthodonticDemoRequestId)?.lines ?? [])
     .filter((line) => line.itemId)
@@ -93,6 +103,11 @@ function createInitialState(role: DemoRole = 'nurse-105', demoStarted = false): 
       'room-102': [],
       'room-105': [],
     },
+    removedCabinetMaterialBatchIds: {
+      'room-101': [],
+      'room-102': [],
+      'room-105': [],
+    },
     activeRequestId: initialMockRequests[0]?.id,
   }
 }
@@ -106,7 +121,9 @@ function roleForCurrentRoute(fallback: DemoRole): DemoRole {
 
   if (seniorRoutePaths.has(pathname)) return 'senior-nurse'
   if (pathname === '/analytics') return 'manager'
-  if (pathname === '/cabinet') return 'nurse-105'
+  if (pathname === '/cabinet' || pathname.startsWith('/cabinet/')) {
+    return fallback.startsWith('nurse-') ? fallback : 'nurse-105'
+  }
 
   return fallback
 }
@@ -212,7 +229,7 @@ function looksLikeGeneratedRequestTitle(title: string | undefined, catalog = moc
 function defaultRequestTitle(roomId?: string) {
   const room = mockRooms.find((item) => item.id === roomId)
   if (roomId === 'room-105') return 'Ортодонтия май расходники'
-  return `${room?.title ?? 'Кабинет'}: материалы на прием`
+  return `${room?.title ?? 'Кабинет'}: складской запас`
 }
 
 function isLegacyOrthodonticDemoRequest(request: SupplyRequest) {
@@ -324,6 +341,7 @@ function hydrateState(storedState: Partial<DemoState>) {
   nextState.catalog = mergeById(nextState.catalog, mockCatalog)
   nextState.stock = mergeStock(nextState.stock)
   nextState.orders = removeLegacyOrthodonticSupplierOrders(nextState.orders)
+  nextState.journal = mergeById(nextState.journal, mockJournal)
 
   const storedRequests = (nextState.requests ?? []).filter((request) => !isLegacyOrthodonticDemoRequest(request))
   const storedRequestById = new Map(storedRequests.map((request) => [request.id, request]))
@@ -332,12 +350,15 @@ function hydrateState(storedState: Partial<DemoState>) {
     const mockRequest = initialMockRequests.find((item) => item.id === request.id)
 
     if (mockRequest) {
+      const shouldRefreshIssuedMock = refreshedIssuedMockRequestIds.has(mockRequest.id)
+
       return {
         ...request,
+        status: shouldRefreshIssuedMock ? mockRequest.status : request.status,
         title: mockRequest.title,
         comment: mockRequest.comment,
         createdBy: mockRequest.createdBy,
-        lines: mergeRequestLines(request.lines, mockRequest.lines),
+        lines: shouldRefreshIssuedMock ? mockRequest.lines : mergeRequestLines(request.lines, mockRequest.lines),
       }
     }
 
@@ -504,7 +525,7 @@ function buildRequestTitle(state: DemoState, cart: RequestCartLine[], roomTitle?
 
   if (sourceRequest?.title) return sourceRequest.title
 
-  return roomTitle === 'Ортодонтия' ? 'Ортодонтия май расходники' : `${roomTitle ?? 'Кабинет'}: материалы на прием`
+  return roomTitle === 'Ортодонтия' ? 'Ортодонтия май расходники' : `${roomTitle ?? 'Кабинет'}: складской запас`
 }
 
 function recalculateRequestStatus(request: SupplyRequest) {
@@ -725,7 +746,8 @@ interface DemoContextValue {
   addManualLineToCart: (manualName: string, quantity: number, comment?: string) => void
   updateCartLine: (lineId: string, patch: Partial<RequestCartLine>) => void
   removeCartLine: (lineId: string) => void
-  submitRequest: (comment?: string) => string | null
+  removeCabinetMaterialBatch: (batchId: string) => void
+  submitRequest: (createdBy: string, comment?: string) => string | null
   setActiveRequest: (requestId: string) => void
   issueFullLine: (requestId: string, lineId: string) => void
   issuePartialLine: (requestId: string, lineId: string, quantity: number) => void
@@ -757,7 +779,7 @@ export function DemoProvider({ children }: PropsWithChildren) {
       const hydrated = hydrateState(current)
       return JSON.stringify(hydrated) === JSON.stringify(current) ? current : hydrated
     })
-  }, [])
+  }, [mockDataRevision])
 
   useEffect(() => {
     window.localStorage.setItem(storageKey, JSON.stringify(state))
@@ -786,6 +808,25 @@ export function DemoProvider({ children }: PropsWithChildren) {
 
   const setRole = useCallback((role: DemoRole) => {
     setState((current) => ({ ...current, role, uiMessage: undefined }))
+  }, [])
+
+  const removeCabinetMaterialBatch = useCallback((batchId: string) => {
+    setState((current) => {
+      const roomId = roleToRoomId(current.role)
+      if (!roomId) return current
+
+      const removedForRoom = current.removedCabinetMaterialBatchIds?.[roomId] ?? []
+      if (removedForRoom.includes(batchId)) return current
+
+      return {
+        ...current,
+        removedCabinetMaterialBatchIds: {
+          ...current.removedCabinetMaterialBatchIds,
+          [roomId]: [...removedForRoom, batchId],
+        },
+        uiMessage: 'Материал удалён из кабинета',
+      }
+    })
   }, [])
 
   const loadRequestDraft = useCallback((requestId: string) => {
@@ -892,7 +933,7 @@ export function DemoProvider({ children }: PropsWithChildren) {
     })
   }, [])
 
-  const submitRequest = useCallback((comment?: string) => {
+  const submitRequest = useCallback((createdBy: string, comment?: string) => {
     let createdId: string | null = null
 
     setState((current) => {
@@ -902,15 +943,18 @@ export function DemoProvider({ children }: PropsWithChildren) {
       const cart = current.carts[roomId] ?? []
       if (!cart.length) return current
 
+      const room = current.rooms.find((item) => item.id === roomId)
+      const responsible = createdBy.trim()
+      if (!responsible || !room?.nurseNames.includes(responsible)) return current
+
       const next = clone(current)
-      const room = next.rooms.find((item) => item.id === roomId)
       const requestId = nextNumber('REQ', next.requests.map((item) => item.id))
       const createdAt = now()
 
       const request: SupplyRequest = {
         id: requestId,
         roomId,
-        createdBy: room?.nurseName ?? 'Медсестра',
+        createdBy: responsible,
         createdAt,
         status: 'sent',
         title: buildRequestTitle(next, cart, room?.title),
@@ -939,7 +983,7 @@ export function DemoProvider({ children }: PropsWithChildren) {
         requestId,
         type: 'request-created',
         title: 'Заявка создана',
-        description: `Кабинет ${room?.number ?? ''} создал заявку ${requestId}.`,
+        description: `${responsible} создала заявку ${requestId} для кабинета ${room?.number ?? ''}.`,
         createdAt,
       })
       addJournal(next, {
@@ -1524,6 +1568,7 @@ export function DemoProvider({ children }: PropsWithChildren) {
       addManualLineToCart,
       updateCartLine,
       removeCartLine,
+      removeCabinetMaterialBatch,
       submitRequest,
       setActiveRequest,
       issueFullLine,
@@ -1555,6 +1600,7 @@ export function DemoProvider({ children }: PropsWithChildren) {
       addManualLineToCart,
       updateCartLine,
       removeCartLine,
+      removeCabinetMaterialBatch,
       submitRequest,
       setActiveRequest,
       issueFullLine,

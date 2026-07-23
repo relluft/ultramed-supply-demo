@@ -351,26 +351,23 @@ export function StartPage() {
       <AnimatePresence>
         {modalOpen ? (
           <motion.div
-            className="landing-auth-overlay fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#eaf6f1]/82 px-4 py-6 backdrop-blur-xl"
+            className="landing-auth-overlay fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#eaf6f1] px-4 py-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <div className="pointer-events-none absolute inset-[-8%] [background:radial-gradient(circle_at_48%_38%,rgba(255,255,255,0.96)_0%,rgba(235,250,243,0.82)_38%,rgba(181,224,207,0.46)_72%,rgba(15,70,56,0.28)_100%)] [background-size:140%_140%] [animation:landing-gradient-flow_26s_ease-in-out_infinite]" />
-            <div className="pointer-events-none absolute left-[-14%] top-[15%] h-[34%] w-[130%] rotate-[-7deg] bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.44)_30%,rgba(205,245,228,0.44)_50%,rgba(255,255,255,0.26)_70%,transparent_100%)] blur-3xl [animation:landing-soft-wave_22s_ease-in-out_infinite]" />
-            <div className="pointer-events-none absolute bottom-[10%] left-[-12%] h-[28%] w-[128%] rotate-[6deg] bg-[linear-gradient(90deg,transparent_0%,rgba(188,232,214,0.34)_24%,rgba(255,255,255,0.42)_52%,rgba(214,246,232,0.26)_76%,transparent_100%)] blur-3xl [animation:landing-soft-wave-alt_28s_ease-in-out_infinite]" />
+            <div className="pointer-events-none absolute inset-[-8%] [background:radial-gradient(circle_at_48%_38%,rgba(255,255,255,0.96)_0%,rgba(235,250,243,0.82)_38%,rgba(181,224,207,0.46)_72%,rgba(15,70,56,0.28)_100%)]" />
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,transparent_0%,transparent_62%,rgba(5,47,43,0.18)_100%)]" />
             <motion.section
-              className="relative w-full max-w-[620px] overflow-hidden rounded-[30px] bg-white/72 p-px shadow-[0_34px_88px_rgba(16,75,58,0.22),0_2px_10px_rgba(16,75,58,0.08)] backdrop-blur-2xl"
+              className="relative w-full max-w-[620px] overflow-hidden rounded-[30px] bg-white/72 p-px shadow-[0_34px_88px_rgba(16,75,58,0.22),0_2px_10px_rgba(16,75,58,0.08)]"
               initial={{ opacity: 0, y: 18, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.98 }}
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             >
-              <div className="pointer-events-none absolute inset-[-72%] bg-[conic-gradient(from_90deg,transparent_0deg,rgba(255,255,255,0.78)_55deg,rgba(129,226,176,0.48)_115deg,rgba(255,255,255,0.88)_165deg,transparent_220deg,rgba(47,154,111,0.24)_292deg,transparent_360deg)] [animation:landing-modal-border_14s_linear_infinite]" />
+              <div className="pointer-events-none absolute inset-[-72%] bg-[conic-gradient(from_90deg,transparent_0deg,rgba(255,255,255,0.78)_55deg,rgba(129,226,176,0.48)_115deg,rgba(255,255,255,0.88)_165deg,transparent_220deg,rgba(47,154,111,0.24)_292deg,transparent_360deg)]" />
               <div className="relative overflow-hidden rounded-[29px] border border-white/72 bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(243,252,248,0.90)_52%,rgba(226,246,237,0.88)_100%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.95)] md:p-5">
-                <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(121,226,166,0.62),rgba(255,255,255,0.95),transparent)] [animation:landing-border-light_9s_ease-in-out_infinite]" />
-                <div className="pointer-events-none absolute inset-y-[-20%] left-[-24%] w-[42%] bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.52),rgba(197,245,222,0.22),transparent)] blur-xl [animation:landing-card-scan_10s_ease-in-out_infinite]" />
+                <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(121,226,166,0.62),rgba(255,255,255,0.95),transparent)]" />
                 <div className="relative grid grid-cols-[40px_minmax(0,1fr)_40px] items-start gap-3">
                   <div />
                   <div className="text-center">
@@ -451,7 +448,6 @@ export function StartPage() {
                   transition={{ duration: 0.26, delay: 0.16, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(121,226,166,0.52),transparent)]" />
-                  <div className="pointer-events-none absolute inset-y-[-20%] left-[-24%] w-[42%] bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.44),rgba(197,245,222,0.18),transparent)] blur-xl [animation:landing-card-scan_12s_ease-in-out_infinite]" />
 
                   <div className="relative grid gap-3">
                     <label className="grid gap-1.5">

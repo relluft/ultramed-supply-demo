@@ -66,7 +66,7 @@ export function ZoomControl() {
 
   return (
     <div
-      className="fixed bottom-3 right-3 z-[100] flex items-center gap-1 rounded-md border border-slate-200 bg-white/95 p-1 text-slate-700 shadow-sm"
+      className="flex w-fit self-end items-center gap-1 rounded-md border border-slate-200 bg-white/95 p-1 text-slate-700 shadow-sm"
       role="group"
       aria-label="Interface zoom"
     >

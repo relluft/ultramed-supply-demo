@@ -56,8 +56,23 @@ img {
   zoom: var(--app-zoom);
 }
 
+html,
+body,
+#root,
+#root * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
 ::selection {
-  background: rgba(23, 23, 23, 0.14);
+  color: inherit;
+  background: transparent;
+}
+
+::-moz-selection {
+  color: inherit;
+  background: transparent;
 }
 
 ::-webkit-scrollbar {
@@ -81,6 +96,8 @@ img {
 .app-workspace-bg {
   position: relative;
   isolation: isolate;
+  overflow: clip;
+  overflow-anchor: none;
   background:
     radial-gradient(circle at 50% 42%, #ffffff 0%, #ffffff 22%, #eef9f4 45%, #cfe8df 72%, #174b41 100%);
   background-size: 150% 150%;
@@ -156,6 +173,25 @@ img {
   position: relative;
 }
 
+.app-frame-shell {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 252, 250, 0.96)),
+    #f6faf8;
+}
+
+.app-workspace-surface {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(248, 252, 250, 0.68)),
+    rgba(246, 250, 248, 0.82);
+}
+
+.app-sidebar {
+  border-color: rgba(223, 232, 228, 0.98) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 252, 250, 0.92)),
+    rgba(255, 255, 255, 0.9) !important;
+}
+
 .app-panel::before,
 .app-topbar::before,
 .app-sidebar::before,
@@ -204,6 +240,78 @@ img {
 
 .app-workspace-bg button:hover {
   transform: none !important;
+}
+
+.cabinet-home {
+  background: #f2f5f3;
+}
+
+.cabinet-home-card {
+  box-shadow: 0 1px 2px rgba(31, 68, 55, 0.04) !important;
+}
+
+.cabinet-home-primary {
+  color: #173c31 !important;
+  box-shadow: none !important;
+}
+
+.cabinet-home-quick-link {
+  display: inline-flex;
+  min-height: 90px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  border: 1px solid #dfe6e2;
+  border-radius: 10px;
+  padding: 15px;
+  color: #29483d;
+  background: #ffffff;
+  box-shadow: none !important;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.cabinet-home-quick-link:hover {
+  border-color: #a9cabc;
+  background: #f6faf8;
+  color: #1f6c55;
+}
+
+.cabinet-home-quick-icon {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d8e9e1;
+  border-radius: 8px;
+  color: #306858;
+  background: #f1f6f3;
+}
+
+.cabinet-home-quick-caption {
+  display: block;
+  margin-top: 2px;
+  color: #74877f;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.cabinet-home-quick-link:focus-visible {
+  outline: 3px solid rgba(78, 183, 139, 0.24);
+  outline-offset: 1px;
+}
+
+@media (max-width: 640px) {
+  .cabinet-home {
+    align-items: flex-start;
+    border-radius: 12px;
+  }
+
+  .cabinet-home-card {
+    border-radius: 10px;
+  }
 }
 
 .app-panel table,
@@ -283,4 +391,36 @@ table tbody tr[class*="bg-emerald"] > td:first-child {
 
 table tbody tr:not([class*="bg-rose"]):not([class*="bg-red"]):not([class*="bg-amber"]):not([class*="bg-sky"]):not([class*="bg-emerald"]):hover > td:first-child {
   border-left-color: #64748b;
+}
+
+.overview-request-rail {
+  --overview-rail-color: #64748b;
+}
+
+.overview-request-rail::before {
+  position: absolute;
+  z-index: 1;
+  top: -1px;
+  bottom: -1px;
+  left: 0;
+  width: 4px;
+  content: '';
+  pointer-events: none;
+  background-color: var(--overview-rail-color);
+}
+
+.overview-request-rail--success {
+  --overview-rail-color: #15803d;
+}
+
+.overview-request-rail--warning {
+  --overview-rail-color: #eab308;
+}
+
+.overview-request-rail--danger {
+  --overview-rail-color: #be123c;
+}
+
+.overview-request-rail--info {
+  --overview-rail-color: #0369a1;
 }

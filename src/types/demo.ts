@@ -5,7 +5,7 @@ export interface Room {
   number: string
   title: string
   type: string
-  nurseName: string
+  nurseNames: string[]
 }
 
 export interface Supplier {
@@ -210,6 +210,7 @@ export interface DemoState {
   orders: SupplierOrder[]
   journal: JournalEvent[]
   carts: Record<string, RequestCartLine[]>
+  removedCabinetMaterialBatchIds: Record<string, string[]>
   activeRequestId?: string
   uiMessage?: string
 }

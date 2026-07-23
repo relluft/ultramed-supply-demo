@@ -18,7 +18,7 @@ export const roleLabels: Record<DemoRole, string> = {
   'nurse-101': 'Кабинет 101',
   'nurse-102': 'Кабинет 102',
   'nurse-105': 'Кабинет 105',
-  'senior-nurse': 'Старшая медсестра',
+  'senior-nurse': 'Главная мед. сестра',
   manager: 'Руководитель',
 }
 
