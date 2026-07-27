@@ -1,5 +1,6 @@
 ﻿import { BellRing, Check, CircleHelp, Eye, Info, MonitorCog, ShieldCheck, UserRound, Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
+import { RotateCcw } from 'lucide-react'
 import { DensityControl } from '../components/DensityControl'
 import { PageTransition } from '../components/PageTransition'
 import { Surface, WorkspaceButton } from '../components/workspace-v2'
@@ -72,8 +73,21 @@ function SettingsSection({ children, description, icon, title }: {
 }
 
 export function NurseSettingsPage() {
-  const { state: { role, rooms } } = useDemo()
-  const room = getRoomByRole(rooms, role.startsWith('nurse-') ? role : 'nurse-105')
+  const { state: { role, rooms }, resetDemo } = useDemo()
+  const isNurse = role.startsWith('nurse-')
+  const isManager = role === 'manager'
+  const room = getRoomByRole(rooms, isNurse ? role : 'nurse-105')
+  const profileTitle = isNurse ? `Кабинет ${room?.number ?? '—'}` : isManager ? 'Руководитель' : 'Главная медсестра'
+  const profileSubtitle = isNurse
+    ? room?.title ?? 'Стоматологический кабинет'
+    : isManager
+      ? 'Управление клиникой'
+      : 'Снабжение и контроль кабинетов'
+  const accessLabel = isNurse
+    ? 'Доступ младшей медсестры'
+    : isManager
+      ? 'Доступ руководителя'
+      : 'Доступ Главной медсестры'
   const [settings, setSettings] = useState<NurseSettings>(readSettings)
   const [saved, setSaved] = useState(false)
 
@@ -110,6 +124,11 @@ export function NurseSettingsPage() {
     oscillator.addEventListener('ended', () => void context.close())
   }
 
+  function handleResetDemo() {
+    if (!window.confirm('Сбросить демо и удалить все произведенные действия?')) return
+    resetDemo()
+  }
+
   return (
     <PageTransition respectReducedMotion className="nurse-page nurse-settings-page">
       <div className="nurse-settings-container">
@@ -132,9 +151,9 @@ export function NurseSettingsPage() {
             </SettingsSection>
 
             <SettingsSection title="Уведомления" description="Только события, которые требуют вашего внимания" icon={<BellRing size={21} />}>
-              <SettingSwitch label="Изменение статуса заявки" description="Когда заявка принята, выдана частично или закрыта" checked={settings.requestStatusNotifications} onChange={(checked) => updateSetting('requestStatusNotifications', checked)} />
-              <SettingSwitch label="Требуется уточнение" description="Если старшей медсестре нужен комментарий по позиции" checked={settings.clarificationNotifications} onChange={(checked) => updateSetting('clarificationNotifications', checked)} />
-              <SettingSwitch label="Напоминание о черновике" description="Один раз в конце смены, если заявка не отправлена" checked={settings.draftReminders} onChange={(checked) => updateSetting('draftReminders', checked)} />
+              <SettingSwitch label="Изменение статуса заявки" description={isNurse ? 'Когда заявка принята, выдана частично или закрыта' : 'Когда заявка поступила, изменила статус или закрыта'} checked={settings.requestStatusNotifications} onChange={(checked) => updateSetting('requestStatusNotifications', checked)} />
+              <SettingSwitch label="Требуется уточнение" description={isNurse ? 'Если старшей медсестре нужен комментарий по позиции' : 'Если по заявке, кабинету или поставке требуется решение'} checked={settings.clarificationNotifications} onChange={(checked) => updateSetting('clarificationNotifications', checked)} />
+              <SettingSwitch label={isNurse ? 'Напоминание о черновике' : 'Ежедневная сводка'} description={isNurse ? 'Один раз в конце смены, если заявка не отправлена' : 'Краткая сводка по снабжению и кабинетам в конце рабочего дня'} checked={settings.draftReminders} onChange={(checked) => updateSetting('draftReminders', checked)} />
               <div className="nurse-settings-sound-row">
                 <SettingSwitch label="Звук уведомлений" description="Короткий сигнал для важных событий" checked={settings.soundEnabled} onChange={(checked) => updateSetting('soundEnabled', checked)} />
                 <WorkspaceButton variant="secondary" className="nurse-settings-sound-test" disabled={!settings.soundEnabled} onClick={playNotificationSound}>{settings.soundEnabled ? <Volume2 size={17} /> : <VolumeX size={17} />}Проверить звук</WorkspaceButton>
@@ -145,19 +164,29 @@ export function NurseSettingsPage() {
               <SettingSwitch label="Уменьшить движение" description="Отключает плавные переходы и анимацию интерфейса" checked={settings.reducedMotion} onChange={(checked) => updateSetting('reducedMotion', checked)} />
               <SettingSwitch label="Повышенная контрастность" description="Усиливает границы, текст и активные элементы" checked={settings.highContrast} onChange={(checked) => updateSetting('highContrast', checked)} />
             </SettingsSection>
+
+            <SettingsSection title="Демо-данные" description="Возврат к исходному состоянию демонстрации" icon={<RotateCcw size={21} />}>
+              <div className="nurse-settings-reset">
+                <div>
+                  <div className="nurse-settings-row__label">Сбросить демо</div>
+                  <div className="nurse-settings-row__description">Удалит созданные заявки, назначения и другие действия, затем восстановит исходные данные.</div>
+                </div>
+                <WorkspaceButton variant="danger" onClick={handleResetDemo}><RotateCcw size={17} />Сбросить демо</WorkspaceButton>
+              </div>
+            </SettingsSection>
           </div>
 
           <aside className="nurse-settings-aside" aria-label="Сведения о рабочем месте">
             <Surface level="panel" className="nurse-settings-profile">
               <div className="nurse-settings-profile__avatar"><UserRound size={25} strokeWidth={1.8} /></div>
-              <div><div className="nurse-settings-profile__caption">Вы работаете как</div><div className="nurse-settings-profile__title">Кабинет {room?.number ?? '—'}</div><div className="nurse-settings-profile__subtitle">{room?.title ?? 'Стоматологический кабинет'}</div></div>
-              <div className="nurse-settings-profile__meta"><ShieldCheck size={16} />Доступ младшей медсестры</div>
+              <div><div className="nurse-settings-profile__caption">Вы работаете как</div><div className="nurse-settings-profile__title">{profileTitle}</div><div className="nurse-settings-profile__subtitle">{profileSubtitle}</div></div>
+              <div className="nurse-settings-profile__meta"><ShieldCheck size={16} />{accessLabel}</div>
             </Surface>
             <Surface level="panel" className="nurse-settings-note">
-              <span className="nurse-settings-note__icon"><Info size={18} /></span><div><h2>О настройках</h2><p>Они не меняют состав материалов, заявки или данные кабинета — только ваше отображение и способы оповещения.</p></div>
+              <span className="nurse-settings-note__icon"><Info size={18} /></span><div><h2>О настройках</h2><p>Они не меняют рабочие данные — только ваше отображение и способы оповещения.</p></div>
             </Surface>
             <Surface level="panel" className="nurse-settings-help">
-              <CircleHelp size={20} /><div><h2>Нужна помощь?</h2><p>Обратитесь к старшей медсестре, если кабинет или уровень доступа указаны неверно.</p></div>
+              <CircleHelp size={20} /><div><h2>Нужна помощь?</h2><p>{isNurse ? 'Обратитесь к старшей медсестре, если кабинет или уровень доступа указаны неверно.' : 'Обратитесь к администратору системы, если роль или уровень доступа указаны неверно.'}</p></div>
             </Surface>
           </aside>
         </div>

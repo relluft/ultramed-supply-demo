@@ -5,7 +5,6 @@ import {
   useContext,
   useEffect,
   useId,
-  useLayoutEffect,
   useRef,
   useState,
   type ButtonHTMLAttributes,
@@ -55,20 +54,6 @@ export function WorkspaceUiProvider({
     setDensityState(DENSITIES.has(nextDensity) ? nextDensity : DEFAULT_DENSITY)
   }, [])
 
-  useLayoutEffect(() => {
-    const root = document.documentElement
-    const previousZoom = root.style.getPropertyValue('--app-zoom')
-    const previousPriority = root.style.getPropertyPriority('--app-zoom')
-    root.style.setProperty('--app-zoom', '1')
-
-    return () => {
-      if (previousZoom) {
-        root.style.setProperty('--app-zoom', previousZoom, previousPriority)
-      } else {
-        root.style.removeProperty('--app-zoom')
-      }
-    }
-  }, [])
 
   useEffect(() => {
     try {

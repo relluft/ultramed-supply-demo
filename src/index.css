@@ -7,7 +7,6 @@
 
 :root {
   --page-bg: #f7f7f7;
-  --app-zoom: 1;
 }
 
 * {
@@ -53,8 +52,8 @@ img {
 
 #root {
   min-height: 100vh;
-  zoom: var(--app-zoom);
 }
+
 
 html,
 body,
@@ -190,6 +189,103 @@ body,
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 252, 250, 0.92)),
     rgba(255, 255, 255, 0.9) !important;
+}
+
+.workspace-sidebar .workspace-sidebar-group:last-child {
+  padding-bottom: 2px;
+}
+
+.workspace-sidebar .workspace-sidebar-footer {
+  margin-top: auto;
+  padding-top: 3px;
+}
+
+@media (min-width: 1024px) and (min-height: 850px) {
+  .workspace-sidebar .workspace-sidebar-logo {
+    height: 72px;
+  }
+
+  .workspace-sidebar .workspace-sidebar-brand-caption {
+    font-size: 14px;
+  }
+
+  .workspace-sidebar .workspace-sidebar-profile {
+    margin-top: 10px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .workspace-sidebar .workspace-sidebar-profile > div {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .workspace-sidebar .workspace-sidebar-avatar {
+    width: 40px;
+    height: 40px;
+  }
+
+  .workspace-sidebar .workspace-sidebar-avatar svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .workspace-sidebar .workspace-sidebar-account-name {
+    font-size: 14px;
+  }
+
+  .workspace-sidebar .workspace-sidebar-account-role {
+    margin-top: 4px;
+    font-size: 12.5px;
+  }
+
+  .workspace-sidebar .workspace-sidebar-nav {
+    margin-top: 7px;
+    gap: 8px;
+  }
+
+  .workspace-sidebar .workspace-sidebar-home-section {
+    padding-bottom: 10px;
+  }
+
+  .workspace-sidebar .workspace-sidebar-group {
+    gap: 6px;
+    padding-bottom: 10px;
+  }
+
+  .workspace-sidebar .workspace-sidebar-group-title {
+    font-size: 14.5px;
+    line-height: 18px;
+  }
+
+  .workspace-sidebar .workspace-sidebar-link {
+    height: 39px;
+    grid-template-columns: 18px minmax(0, 1fr);
+    border-radius: 9px;
+    padding-right: 16px;
+    font-size: 15px;
+  }
+
+  .workspace-sidebar .workspace-sidebar-link svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .workspace-sidebar .workspace-sidebar-footer {
+    margin-top: auto;
+    padding-top: 3px;
+  }
+
+  .workspace-sidebar .workspace-sidebar-logout {
+    min-height: 38px;
+    grid-template-columns: 18px minmax(0, 1fr);
+    border-radius: 9px;
+    font-size: 13.5px;
+  }
+
+  .workspace-sidebar .workspace-sidebar-logout svg {
+    width: 18px;
+    height: 18px;
+  }
 }
 
 .app-panel::before,

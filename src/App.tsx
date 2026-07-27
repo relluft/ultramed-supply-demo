@@ -2,13 +2,15 @@ import { useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppLayout } from './components/AppLayout'
 import { NurseAppLayout } from './components/NurseAppLayout'
-import { ZoomControl } from './components/ZoomControl'
 import { DemoProvider, useDemo } from './context'
 import { AnalyticsPage } from './pages/AnalyticsPage'
 import { CatalogPage } from './pages/CatalogPage'
 import { JournalPage } from './pages/JournalPage'
 import { NurseCabinetPage } from './pages/NurseCabinetPage'
 import { NurseSettingsPage } from './pages/NurseSettingsPage'
+import { RoomsPage } from './pages/RoomsPage'
+import { WorkspaceUiProvider } from './components/workspace-v2'
+import { RoleHomeDashboard } from './components/RoleHomeDashboard'
 import { ReceiptPage } from './pages/ReceiptPage'
 import { ReplenishmentPage } from './pages/ReplenishmentPage'
 import { SeniorWorkspacePage } from './pages/SeniorWorkspacePage'
@@ -50,6 +52,21 @@ function RequireNurse({ children }: { children: ReactNode }) {
   if (!isNurse) return null
 
   return children
+}
+
+function RequireManager({ children }: { children: ReactNode }) {
+  const {
+    state: { role },
+    setRole,
+  } = useDemo()
+
+  useEffect(() => {
+    if (role !== 'manager') {
+      setRole('manager')
+    }
+  }, [role, setRole])
+
+  return role === 'manager' ? children : null
 }
 
 function AnimatedRoutes() {
@@ -95,6 +112,14 @@ function AnimatedRoutes() {
       </Route>
 
       <Route element={<AppLayout />}>
+        <Route
+          path="/manager"
+          element={
+            <RequireManager>
+              <RoleHomeDashboard role="manager" />
+            </RequireManager>
+          }
+        />
         <Route
           path="/senior"
           element={
@@ -175,6 +200,24 @@ function AnimatedRoutes() {
             </RequireSenior>
           }
         />
+        <Route
+          path="/rooms"
+          element={
+            <RequireSenior>
+              <RoomsPage />
+            </RequireSenior>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <RequireSenior>
+              <WorkspaceUiProvider className="h-full">
+                <NurseSettingsPage />
+              </WorkspaceUiProvider>
+            </RequireSenior>
+          }
+        />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
@@ -182,20 +225,11 @@ function AnimatedRoutes() {
   )
 }
 
-function LegacyZoomBoundary() {
-  const location = useLocation()
-  const isNurseRoute =
-    location.pathname === '/cabinet' || location.pathname.startsWith('/cabinet/')
-
-  return isNurseRoute ? null : <ZoomControl />
-}
-
 function App() {
   return (
     <DemoProvider>
       <BrowserRouter>
         <AnimatedRoutes />
-        <LegacyZoomBoundary />
       </BrowserRouter>
     </DemoProvider>
   )

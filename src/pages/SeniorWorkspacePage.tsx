@@ -1,27 +1,21 @@
 import {
-  BookOpen,
   ArrowLeft,
   CalendarDays,
-  Check,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   ClipboardList,
   ListFilter,
   PackageCheck,
-  PackagePlus,
-  PackageSearch,
   PackageX,
-  Receipt,
   Search,
-  ShoppingCart,
-  Truck,
 } from 'lucide-react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { BrandedLoadingModal } from '../components/BrandedLoadingModal'
 import { PageTransition } from '../components/PageTransition'
+import { RoleHomeDashboard } from '../components/RoleHomeDashboard'
 import { Button, EmptyState, StatusPill, fieldStyles } from '../components/ui'
 import { useDemo } from '../context'
 import {
@@ -32,7 +26,7 @@ import {
   statusTone,
   stockStatusLabels,
 } from '../lib/demoLogic'
-import { cn, formatDateTime, formatNumber } from '../lib/format'
+import { cn, formatDate, formatDateTime, formatNumber } from '../lib/format'
 import type { CatalogItem, RequestStatus, SupplyRequestLine } from '../types/demo'
 
 const allCategory = 'Все разделы'
@@ -42,14 +36,22 @@ const compactHeaderCell =
 const compactTableCell = 'border-b border-slate-100 px-3 py-1 align-middle text-sm leading-5 text-slate-700'
 const overviewHeaderCell = cn(
   compactHeaderCell,
-  '!border-b-2 !border-b-[#66c99d] !border-r-[#8fddbf] !bg-[#c9f8e8] !px-1.5 !py-2.5 !text-[13px] !font-bold !leading-[1.25] !tracking-[0.04em] !text-[#17362d] [font-family:Manrope,var(--font-sans)] shadow-[inset_0_1px_0_rgba(255,255,255,0.78),inset_0_-1px_0_rgba(38,138,104,0.14)] last:!border-r-0',
+  '!border-b !border-b-slate-300 !border-r !border-r-slate-200 !bg-white !px-1.5 !py-2 !text-[12px] !font-normal !leading-none !tracking-normal !text-slate-950 shadow-none last:!border-r-0',
 )
-const overviewHeaderLabel = 'flex min-h-[30px] items-center justify-center text-center'
+const overviewHeaderLabel = 'flex min-h-[22px] items-center justify-center text-center'
 const overviewTableCell = cn(compactTableCell, '!px-1.5 !text-[13px] border-r border-slate-100 last:border-r-0')
-const detailHeaderCell = cn(compactHeaderCell, 'border-r border-slate-200 !text-center last:border-r-0')
-const detailTableCell = cn(compactTableCell, 'border-r border-slate-100 last:border-r-0')
+const detailHeaderCell = cn(
+  compactHeaderCell,
+  '!h-[45px] !border-b !border-b-slate-300 !border-r !border-r-slate-200 !bg-white !px-0.5 !py-2 !text-center !text-[12px] !font-normal !leading-[14px] !tracking-normal !text-slate-950 shadow-none whitespace-normal last:!border-r-0',
+)
+const detailTableCell = cn(
+  compactTableCell,
+  '!h-[43px] !py-0.5 !leading-[18px] border-r border-slate-100 last:border-r-0',
+)
+const requestTableVisibleRowCount = 12
+const requestTableColumnCount = 8
 const overviewFilterControl =
-  'h-9 rounded-md border border-slate-200 bg-white px-3 text-sm font-normal text-slate-700 outline-none transition hover:border-slate-300 hover:bg-slate-50 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-700/10'
+  'h-12 rounded-lg border border-[#a9c9be] bg-white px-4 text-sm font-normal text-slate-700 outline-none transition hover:border-[#7eac9d] hover:bg-[#fbfefd] focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10'
 const allOverviewFilter = 'all'
 type OverviewDatePreset = 'all' | 'latest-week' | 'latest-month' | 'latest-year' | 'custom'
 
@@ -58,7 +60,7 @@ type IssueDraft =
   | { mode: 'partial'; quantity: string }
 type IssueConfirmationStatus = 'idle' | 'loading' | 'done'
 const requestPaneEase = [0.22, 1, 0.36, 1] as const
-const compactRequestPaneWidth = 224
+const compactRequestPaneWidth = 180
 const requestMorphDurationMs = 360
 
 function overviewRequestStatusRank(status: RequestStatus) {
@@ -68,31 +70,6 @@ function overviewRequestStatusRank(status: RequestStatus) {
   return 2
 }
 
-const seniorDashboardGroups = [
-  {
-    title: 'Операции',
-    items: [
-      { to: '/senior#requests', label: 'Заявки', caption: 'Входящие заявки кабинетов и выдача материалов', icon: ClipboardList },
-      { to: '/replenishment', label: 'Пополнение', caption: 'Дефицит после обработки заявки', icon: PackagePlus },
-      { to: '/orders', label: 'Заказы поставщикам', caption: 'Сформировать заказ из пополнения', icon: ShoppingCart },
-      { to: '/receipt', label: 'Приход', caption: 'Принять поставку и обновить склад', icon: Receipt },
-    ],
-  },
-  {
-    title: 'Склад',
-    items: [
-      { to: '/stock', label: 'Остатки', caption: 'Контроль текущего склада после выдачи и прихода', icon: PackageSearch },
-    ],
-  },
-  {
-    title: 'Справочники',
-    items: [
-      { to: '/catalog', label: 'Материалы', caption: 'Карточки, упаковки и поставщики', icon: BookOpen },
-      { to: '/suppliers', label: 'Поставщики', caption: 'Контакты и условия поставки', icon: Truck },
-    ],
-  },
-]
-
 function matchesCatalogQuery(item: CatalogItem, query: string) {
   const value = query.trim().toLowerCase()
   if (!value) return true
@@ -101,6 +78,21 @@ function matchesCatalogQuery(item: CatalogItem, query: string) {
     .join(' ')
     .toLowerCase()
     .includes(value)
+}
+
+function formatPositionCount(count: number) {
+  const lastTwoDigits = count % 100
+  const lastDigit = count % 10
+  const label =
+    lastTwoDigits >= 11 && lastTwoDigits <= 14
+      ? 'позиций'
+      : lastDigit === 1
+        ? 'позиция'
+        : lastDigit >= 2 && lastDigit <= 4
+          ? 'позиции'
+          : 'позиций'
+
+  return `${count} ${label}`
 }
 
 function matchesManualLineQuery(line: SupplyRequestLine, query: string) {
@@ -298,6 +290,7 @@ export function SeniorWorkspacePage() {
   const shouldReduceMotion = useReducedMotion()
   const issueFinishTimerRef = useRef<number | null>(null)
   const overviewDateMenuRef = useRef<HTMLDivElement | null>(null)
+  const overviewFiltersMenuRef = useRef<HTMLDivElement | null>(null)
   const requestWorkspaceRef = useRef<HTMLElement | null>(null)
   const requestWorkspaceHeaderRef = useRef<HTMLDivElement | null>(null)
   const compactRequestListRef = useRef<HTMLDivElement | null>(null)
@@ -314,12 +307,14 @@ export function SeniorWorkspacePage() {
   const [selectedCategory, setSelectedCategory] = useState(allCategory)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [issueDrafts, setIssueDrafts] = useState<Record<string, IssueDraft>>({})
+  const [issueConfirmationOpen, setIssueConfirmationOpen] = useState(false)
   const [issueConfirmationStatus, setIssueConfirmationStatus] = useState<IssueConfirmationStatus>('idle')
   const [openedRequestId, setOpenedRequestId] = useState<string | null>(null)
   const [overviewQuery, setOverviewQuery] = useState('')
   const [overviewStatusFilter, setOverviewStatusFilter] = useState<RequestStatus | typeof allOverviewFilter>(allOverviewFilter)
   const [overviewRoomFilter, setOverviewRoomFilter] = useState(allOverviewFilter)
   const [overviewDatePreset, setOverviewDatePreset] = useState<OverviewDatePreset>('all')
+  const [overviewFiltersMenuOpen, setOverviewFiltersMenuOpen] = useState(false)
   const [overviewDateMenuOpen, setOverviewDateMenuOpen] = useState(false)
   const [overviewCustomStartDate, setOverviewCustomStartDate] = useState('')
   const [overviewCustomEndDate, setOverviewCustomEndDate] = useState('')
@@ -473,7 +468,7 @@ export function SeniorWorkspacePage() {
     ? catalog.find((item) => item.id === selectedItemId) ?? null
     : visibleCatalog[0] ?? null
   const selectedRequestStats = selectedRequest ? getRequestStats(selectedRequest) : undefined
-  const selectedRequestRoom = selectedRequest ? requestRoom(selectedRequest) : undefined
+
   const validIssueDrafts = selectedRequest
     ? Object.entries(issueDrafts).filter(([lineId, draft]) => {
         const line = selectedRequest.lines.find((item) => item.id === lineId)
@@ -487,8 +482,70 @@ export function SeniorWorkspacePage() {
         return quantity > 0 && quantity <= Math.min(available, remaining)
       })
     : []
-  const fullIssueDraftCount = validIssueDrafts.filter(([, draft]) => draft.mode === 'full').length
-  const partialIssueDraftCount = validIssueDrafts.filter(([, draft]) => draft.mode === 'partial').length
+  const validIssueDraftByLineId = new Map(validIssueDrafts)
+  const pendingRequestLines = selectedRequest?.lines.filter(
+    (line) => line.quantity - line.issuedQuantity > 0,
+  ) ?? []
+  const pendingKnownLines = pendingRequestLines.filter((line) => line.itemId)
+  const pendingManualLines = pendingRequestLines.filter((line) => !line.itemId)
+  const unselectedLineCount = pendingRequestLines.filter(
+    (line) => !validIssueDraftByLineId.has(line.id),
+  ).length
+  const partialIssueLineCount = validIssueDrafts.filter(([lineId, draft]) => {
+    const line = selectedRequest?.lines.find((item) => item.id === lineId)
+    if (!line) return false
+
+    const remaining = line.quantity - line.issuedQuantity
+    const issueQuantity = draft.mode === 'full' ? remaining : Math.round(Number(draft.quantity) || 0)
+    return issueQuantity < remaining
+  }).length
+  const deficitLineCount = pendingKnownLines.filter((line) => {
+    if (!line.itemId) return false
+    return getStockQuantity(stock, line.itemId) < line.quantity - line.issuedQuantity
+  }).length
+  const belowMinimumLineCount = validIssueDrafts.filter(([lineId, draft]) => {
+    const line = selectedRequest?.lines.find((item) => item.id === lineId)
+    if (!line?.itemId) return false
+
+    const item = catalog.find((catalogItem) => catalogItem.id === line.itemId)
+    if (!item) return false
+
+    const remaining = line.quantity - line.issuedQuantity
+    const issueQuantity = draft.mode === 'full' ? remaining : Math.round(Number(draft.quantity) || 0)
+    return getStockQuantity(stock, line.itemId) - issueQuantity < item.minStock
+  }).length
+  const issueCriticalMoments: Array<{ tone: 'warning' | 'danger'; text: string }> = []
+
+  if (unselectedLineCount > 0) {
+    issueCriticalMoments.push({
+      tone: 'warning',
+      text: `Без выдачи останется: ${formatPositionCount(unselectedLineCount)}.`,
+    })
+  }
+  if (partialIssueLineCount > 0) {
+    issueCriticalMoments.push({
+      tone: 'warning',
+      text: `Частичная выдача: ${formatPositionCount(partialIssueLineCount)}.`,
+    })
+  }
+  if (deficitLineCount > 0) {
+    issueCriticalMoments.push({
+      tone: 'danger',
+      text: `Недостаточно остатка для полной выдачи: ${formatPositionCount(deficitLineCount)}.`,
+    })
+  }
+  if (belowMinimumLineCount > 0) {
+    issueCriticalMoments.push({
+      tone: 'warning',
+      text: `Ниже минимального остатка после выдачи: ${formatPositionCount(belowMinimumLineCount)}.`,
+    })
+  }
+  if (pendingManualLines.length > 0) {
+    issueCriticalMoments.push({
+      tone: 'warning',
+      text: `Ручные позиции для отдельной сверки: ${formatPositionCount(pendingManualLines.length)}.`,
+    })
+  }
 
   useEffect(() => {
     if (!activeRequestId && sortedRequests[0]) {
@@ -517,7 +574,21 @@ export function SeniorWorkspacePage() {
   }, [overviewDateMenuOpen])
 
   useEffect(() => {
+    if (!overviewFiltersMenuOpen) return
+
+    function handlePointerDown(event: MouseEvent) {
+      if (overviewFiltersMenuRef.current?.contains(event.target as Node)) return
+      setOverviewFiltersMenuOpen(false)
+      setOverviewDateMenuOpen(false)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [overviewFiltersMenuOpen])
+
+  useEffect(() => {
     setIssueDrafts({})
+    setIssueConfirmationOpen(false)
   }, [selectedRequest?.id])
 
   useEffect(() => {
@@ -611,40 +682,22 @@ export function SeniorWorkspacePage() {
     }
   }, [isRequestOverview, selectedItemId, selectedRequest, visibleCatalog])
 
-  function stageFullIssue(lineId: string) {
+  function updateIssueQuantity(lineId: string, quantity: string, remaining: number, available: number) {
     setIssueDrafts((current) => {
-      if (current[lineId]?.mode === 'full') {
+      if (quantity === '') {
         const { [lineId]: _removed, ...rest } = current
         return rest
       }
 
+      const numericQuantity = Math.round(Number(quantity) || 0)
       return {
         ...current,
-        [lineId]: { mode: 'full' },
+        [lineId]:
+          numericQuantity === remaining && available >= remaining
+            ? { mode: 'full' }
+            : { mode: 'partial', quantity },
       }
     })
-  }
-
-  function openPartialIssue(lineId: string) {
-    setIssueDrafts((current) => {
-      const existing = current[lineId]
-      if (existing?.mode === 'partial') {
-        const { [lineId]: _removed, ...rest } = current
-        return rest
-      }
-
-      return {
-        ...current,
-        [lineId]: { mode: 'partial', quantity: '' },
-      }
-    })
-  }
-
-  function updatePartialIssue(lineId: string, quantity: string) {
-    setIssueDrafts((current) => ({
-      ...current,
-      [lineId]: { mode: 'partial', quantity },
-    }))
   }
 
   function confirmIssueDrafts() {
@@ -734,6 +787,7 @@ export function SeniorWorkspacePage() {
     setOverviewStatusFilter(allOverviewFilter)
     setOverviewRoomFilter(allOverviewFilter)
     setOverviewDatePreset('all')
+    setOverviewFiltersMenuOpen(false)
     setOverviewDateMenuOpen(false)
     setOverviewCustomStartDate('')
     setOverviewCustomEndDate('')
@@ -744,14 +798,24 @@ export function SeniorWorkspacePage() {
     const manualCount = request.lines.length - knownLines.length
     const canIssue = knownLines.filter((line) => {
       if (!line.itemId) return false
-      return getStockQuantity(stock, line.itemId) >= line.quantity - line.issuedQuantity
+      const remaining = line.quantity - line.issuedQuantity
+      return remaining > 0 && getStockQuantity(stock, line.itemId) >= remaining
     }).length
     const deficit = knownLines.filter((line) => {
       if (!line.itemId) return false
-      return getStockQuantity(stock, line.itemId) < line.quantity - line.issuedQuantity
+      const remaining = line.quantity - line.issuedQuantity
+      return remaining > 0 && getStockQuantity(stock, line.itemId) < remaining
+    }).length
+    const lowStock = knownLines.filter((line) => {
+      if (!line.itemId) return false
+      const remaining = line.quantity - line.issuedQuantity
+      const available = getStockQuantity(stock, line.itemId)
+      const item = catalog.find((catalogItem) => catalogItem.id === line.itemId)
+
+      return remaining > 0 && available >= remaining && item !== undefined && available - remaining < item.minStock
     }).length
 
-    return { canIssue, deficit, manualCount }
+    return { canIssue, deficit, lowStock, manualCount }
   }
 
   function renderRequestContext() {
@@ -760,32 +824,62 @@ export function SeniorWorkspacePage() {
     const creatorName = selectedRequest.createdBy
 
     return (
-      <div className="app-soft-card grid min-w-0 gap-x-3 gap-y-2 rounded-md border px-3 py-2 text-xs text-slate-500 xl:grid-cols-[120px_215px_105px_minmax(0,1fr)]">
-        <div className="min-w-0 border-r border-slate-200 pr-3">
-          <div className="mb-1 text-[11px] font-semibold uppercase text-slate-400">Кабинет</div>
-          <div className="text-sm font-semibold leading-5 text-slate-950">{requestCabinetLabel(selectedRequest)}</div>
-          <div className="mt-0.5 leading-4">{selectedRequestRoom?.type ?? 'кабинет'}</div>
+      <div
+        data-testid="request-context"
+        className="grid w-full min-w-0 items-stretch border-t border-slate-200 pt-1.5 text-sm text-slate-950 md:grid-cols-[minmax(105px,0.9fr)_minmax(120px,1fr)_minmax(150px,1.2fr)_minmax(65px,0.55fr)_minmax(100px,0.8fr)_minmax(180px,1.35fr)]"
+      >
+        <div className="flex min-h-[66px] min-w-0 flex-col items-center justify-start px-2 py-1.5 text-center md:border-r md:border-slate-200">
+          <div className="mb-1 flex h-[17px] items-start justify-center text-[12px] font-normal uppercase tracking-[0.04em] text-slate-500">Кабинет</div>
+          <div className="text-[16px] font-normal leading-5 text-slate-950">{requestCabinetLabel(selectedRequest)}</div>
         </div>
-        <div className="min-w-0 border-r border-slate-200 pr-3">
-          <div className="mb-1 text-[11px] font-semibold uppercase text-slate-400">Запрос создан</div>
-          <div className="break-words text-sm font-semibold leading-5 text-slate-950">{creatorName}</div>
-          <div className="mt-0.5 leading-4">медсестра</div>
+        <div className="flex min-h-[66px] min-w-0 flex-col items-center justify-start border-t border-slate-200 px-2 py-1.5 text-center md:border-r md:border-t-0">
+          <div className="mb-1 flex h-[17px] items-start justify-center text-[12px] font-normal uppercase tracking-[0.04em] text-slate-500">Подана</div>
+          <div className="text-left text-[14px] font-normal leading-[18px] text-slate-950">
+            <div><span className="text-slate-500">Дата:</span> {formatDate(selectedRequest.createdAt)}</div>
+            <div><span className="text-slate-500">Время:</span> {formatRequestTimeLabel(selectedRequest.createdAt)}</div>
+          </div>
         </div>
-        <div className="min-w-0 border-r border-slate-200 pr-3">
-          <div className="mb-1 text-[11px] font-semibold uppercase text-slate-400">Подана</div>
-          <div className="text-sm font-semibold leading-5 text-slate-950">
-            {formatDateTime(selectedRequest.createdAt)}
-          </div>
-          <div className="mt-0.5 leading-4">подана заявка</div>
+        <div className="flex min-h-[66px] min-w-0 flex-col items-center justify-start border-t border-slate-200 px-2 py-1.5 text-center md:border-r md:border-t-0">
+          <div className="mb-0.5 flex h-[17px] items-start justify-center text-[12px] font-normal uppercase tracking-[0.04em] text-slate-500">Статус заявки</div>
+          <StatusPill
+            tone={statusTone(selectedRequest.status)}
+            className="min-h-[40px] w-full !rounded !border !px-2 !py-1 !font-normal !text-slate-950 shadow-none"
+          >
+            <span className="text-[15px] font-normal leading-5">{requestStatusLabel(selectedRequest)}</span>
+          </StatusPill>
         </div>
-        <div className="min-w-0 xl:col-span-4 xl:border-t xl:border-slate-200 xl:pt-2 min-[1700px]:!col-span-1 min-[1700px]:!border-t-0 min-[1700px]:!pt-0">
-          <div className="mb-1 text-[11px] font-semibold uppercase text-slate-400">Комментарий</div>
-          <div className="whitespace-normal break-words text-sm font-semibold leading-5 text-slate-950">
-            {requestTitle(selectedRequest)}
+        <div className="flex min-h-[66px] min-w-0 flex-col items-center justify-start border-t border-slate-200 px-2 py-1.5 text-center md:border-r md:border-t-0">
+          <div className="mb-1 flex h-[17px] items-start justify-center text-[12px] font-normal uppercase tracking-[0.04em] text-slate-500">Позиций</div>
+          <div className="text-[16px] font-normal leading-5 text-slate-950">{selectedRequest.lines.length}</div>
+        </div>
+        <div className="flex min-h-[66px] min-w-0 flex-col items-center justify-start border-t border-slate-200 px-2 py-1.5 text-center md:border-r md:border-t-0">
+          <div className="mb-1 flex h-[17px] items-start justify-center text-[12px] font-normal uppercase tracking-[0.04em] text-slate-500">В наличии</div>
+          <div
+            className={cn(
+              'text-[16px] font-normal leading-5',
+              (selectedRequestStats?.deficit ?? 0) > 0
+                ? 'text-rose-700'
+                : (selectedRequestStats?.lowStock ?? 0) > 0
+                  ? 'text-amber-700'
+                  : 'text-emerald-700',
+            )}
+          >
+            {selectedRequestStats?.canIssue ?? 0}
           </div>
-          <div className="mt-1 whitespace-normal break-words text-sm leading-5 text-slate-800">
-            {selectedRequest.comment || 'Комментарий не указан'}
-          </div>
+          {(selectedRequestStats?.deficit ?? 0) > 0 ? (
+            <div className="text-[11px] font-normal leading-4 text-rose-700">
+              не хватает: {selectedRequestStats?.deficit}
+            </div>
+          ) : (selectedRequestStats?.lowStock ?? 0) > 0 ? (
+            <div className="text-[11px] font-normal leading-4 text-amber-700">
+              малый остаток: {selectedRequestStats?.lowStock}
+            </div>
+          ) : null}
+        </div>
+        <div className="flex min-h-[66px] min-w-0 flex-col items-center justify-start border-t border-slate-200 px-2 py-1.5 text-center md:border-t-0">
+          <div className="mb-1 flex h-[17px] items-start justify-center text-[12px] font-normal uppercase tracking-[0.04em] text-slate-500">Ответственный</div>
+          <div className="break-words text-[15px] font-normal leading-[18px] text-slate-950">{creatorName}</div>
+          <div className="text-[13px] font-normal leading-4 text-slate-500">медсестра</div>
         </div>
       </div>
     )
@@ -793,8 +887,8 @@ export function SeniorWorkspacePage() {
 
   function renderRequestsOverview() {
     return (
-      <div className="app-section-band flex min-h-0 flex-1 flex-col p-3">
-        <div className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="app-section-band flex min-h-0 flex-1 flex-col p-0">
+        <div className="min-h-0 flex-1 overflow-auto overscroll-contain border-b-0 border-l-0 border-r-0 border-t-0 bg-white">
           <table className="w-full table-fixed border-separate border-spacing-0">
             <thead>
               <tr>
@@ -909,41 +1003,7 @@ export function SeniorWorkspacePage() {
   }
 
   if (!location.hash) {
-    return (
-      <PageTransition className="grid gap-4">
-        <section className="app-panel rounded-lg border p-4">
-          <h1 className="text-2xl font-semibold text-slate-950">Главная</h1>
-          <p className="mt-1 text-sm text-slate-500">Выберите, с чего начать</p>
-        </section>
-
-        <section className="grid gap-3">
-          {seniorDashboardGroups.map((group) => (
-            <div key={group.title} className="app-panel rounded-lg border p-4">
-              <div className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">{group.title}</div>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                {group.items.map((item) => {
-                  const Icon = item.icon
-
-                  return (
-                    <Link
-                      key={item.to}
-                      to={item.to}
-                      className="app-soft-card group min-h-[126px] rounded-lg border p-4 transition hover:border-emerald-200 hover:bg-emerald-50/60 hover:shadow-sm"
-                    >
-                      <div className="app-soft-card flex h-9 w-9 items-center justify-center rounded-md border text-emerald-800 transition group-hover:border-emerald-200">
-                        <Icon size={18} />
-                      </div>
-                      <div className="mt-3 text-base font-semibold text-slate-950">{item.label}</div>
-                      <div className="mt-1 text-sm leading-5 text-slate-500">{item.caption}</div>
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
-        </section>
-      </PageTransition>
-    )
+    return <RoleHomeDashboard role="senior-nurse" />
   }
 
   return (
@@ -1081,7 +1141,7 @@ export function SeniorWorkspacePage() {
                           'w-full min-w-0 overflow-hidden rounded-md border text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2',
                           isRequestsMode
                             ? cn(
-                                'overview-request-rail relative min-h-[58px] px-2.5 py-2 pl-3 focus-visible:ring-slate-400/40',
+                                'overview-request-rail relative min-h-[76px] px-2.5 py-2 pl-3 focus-visible:ring-slate-400/40',
                                 overviewStatusRailClass(requestTone),
                                 overviewStatusHoverClass(requestTone),
                               )
@@ -1098,12 +1158,12 @@ export function SeniorWorkspacePage() {
                             <div className="min-w-0 truncate text-sm font-semibold text-slate-950">
                               {requestCabinetLabel(request)}
                             </div>
-                            <div className="mt-1.5 flex min-w-0 items-center justify-start gap-2 text-xs text-slate-500">
+                            <div className="mt-1.5 flex min-w-0 flex-wrap items-center justify-start gap-x-2 gap-y-0.5 text-xs text-slate-500">
                               <time className="shrink-0" dateTime={request.createdAt}>
                                 {formatRequestDateLabel(request.createdAt)} · {formatRequestTimeLabel(request.createdAt)}
                               </time>
                               <span className="shrink-0 font-medium text-slate-600">
-                                {request.lines.length} поз.
+                                позиций {request.lines.length}
                               </span>
                             </div>
                             <span className="sr-only">Статус: {requestStatusLabel(request)}</span>
@@ -1139,39 +1199,47 @@ export function SeniorWorkspacePage() {
             ref={isRequestsMode ? requestWorkspaceHeaderRef : undefined}
             layout
             transition={requestPaneTransition}
-            className="shrink-0 border-b border-slate-200 bg-white p-4"
+            className={cn(
+              'shrink-0 border-b',
+              isRequestOverview
+                ? 'border-[#d5e4de] bg-[linear-gradient(105deg,#e8f7f1_0%,#f4faf7_48%,#ffffff_100%)] px-5 py-[18px]'
+                : isRequestsMode
+                  ? 'border-slate-200 bg-white px-4 py-3'
+                  : 'border-slate-200 bg-white p-4',
+            )}
           >
-            <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-start 2xl:justify-between">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-lg font-semibold leading-none text-slate-950">
-                    {isRequestOverview ? 'Заявки кабинетов' : isRequestsMode ? `Состав заявки: ${requestTitle(selectedRequest)}` : 'Материалы и выдача'}
+                  <h1 className={cn(
+                    'font-semibold text-slate-950',
+                    isRequestOverview ? 'text-base leading-5' : isRequestsMode ? 'text-xl leading-6' : 'text-lg leading-none',
+                  )}>
+                    {isRequestOverview ? 'Заявки кабинетов' : isRequestsMode ? requestTitle(selectedRequest) : 'Материалы и выдача'}
                   </h1>
-                  {!isRequestOverview && selectedRequest ? (
+                  {!isRequestOverview && !isRequestsMode && selectedRequest ? (
                     <StatusPill tone={statusTone(selectedRequest.status)}>
                       {requestStatusLabel(selectedRequest)}
                     </StatusPill>
                   ) : null}
                 </div>
+                {isRequestOverview ? (
+                  <div className="mt-0.5 text-xs leading-4 text-slate-500">
+                    Поиск и фильтрация заявок кабинетов
+                  </div>
+                ) : null}
                 {!isRequestOverview && !isRequestsMode ? (
                   <div className="mt-1 text-sm text-slate-500">
                     Таблица материалов, остатки и действия по активной заявке на одном рабочем экране.
                   </div>
                 ) : null}
               </div>
-              {!isRequestOverview && selectedRequest ? (
-                <div className="flex shrink-0 flex-wrap gap-2">
-                  <Button variant="secondary" onClick={prepareAvailableIssue}>
-                    <PackageCheck size={16} />
-                    Подготовить выдачу доступного
-                  </Button>
-                </div>
-              ) : null}
+
             </div>
 
             {isRequestOverview ? (
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <label className="relative h-9 min-w-[230px] flex-1 max-w-[340px]">
+                <label className="relative h-12 min-w-[260px] flex-1 max-w-[340px]">
                   <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                   <input
                     value={overviewQuery}
@@ -1181,11 +1249,12 @@ export function SeniorWorkspacePage() {
                   />
                 </label>
 
-                <label className="relative h-9 w-[150px]">
+                <label className="relative h-12 w-[150px]">
                   <select
                     value={overviewStatusFilter}
                     onChange={(event) => setOverviewStatusFilter(event.target.value as RequestStatus | typeof allOverviewFilter)}
                     className={cn(overviewFilterControl, 'w-full appearance-none pr-8')}
+                    aria-label="Статус заявки"
                   >
                     <option value={allOverviewFilter}>Все статусы</option>
                     {overviewStatusOptions.map((status) => (
@@ -1197,11 +1266,12 @@ export function SeniorWorkspacePage() {
                   <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                 </label>
 
-                <label className="relative h-9 w-[150px]">
+                <label className="relative h-12 w-[150px]">
                   <select
                     value={overviewRoomFilter}
                     onChange={(event) => setOverviewRoomFilter(event.target.value)}
                     className={cn(overviewFilterControl, 'w-full appearance-none pr-8')}
+                    aria-label="Кабинет"
                   >
                     <option value={allOverviewFilter}>Все кабинеты</option>
                     {overviewRoomOptions.map((room) => (
@@ -1213,132 +1283,230 @@ export function SeniorWorkspacePage() {
                   <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                 </label>
 
-                <div ref={overviewDateMenuRef} className="relative h-9 w-[168px]">
+                <label className="relative h-12 w-[168px]">
+                  <CalendarDays className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-500" size={15} />
+                  <select
+                    value={overviewDatePreset}
+                    onChange={(event) => {
+                      setOverviewDatePreset(event.target.value as OverviewDatePreset)
+                      setOverviewDateMenuOpen(false)
+                    }}
+                    className={cn(overviewFilterControl, 'w-full appearance-none pl-9 pr-8')}
+                    aria-label="Период"
+                  >
+                    <option value="all">Все даты</option>
+                    <option value="latest-week">За неделю</option>
+                    <option value="latest-month">За месяц</option>
+                    <option value="latest-year">За год</option>
+                    <option value="custom">Свой период</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                </label>
+
+                <div ref={overviewFiltersMenuRef} className="relative">
                   <button
                     type="button"
-                    onClick={() => setOverviewDateMenuOpen((current) => !current)}
-                    className={cn(overviewFilterControl, 'flex w-full items-center gap-2 pr-8 text-left')}
-                    aria-expanded={overviewDateMenuOpen}
+                    onClick={() => {
+                      setOverviewFiltersMenuOpen((current) => !current)
+                      setOverviewDateMenuOpen(false)
+                    }}
+                    className={cn(
+                      'inline-flex h-12 shrink-0 items-center gap-2 rounded-lg border px-4 text-sm font-normal transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/15',
+                      overviewFiltersActive
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                        : 'border-[#a9c9be] bg-white text-slate-700 hover:border-[#7eac9d] hover:bg-[#fbfefd] hover:text-slate-950',
+                    )}
+                    aria-expanded={overviewFiltersMenuOpen}
+                    aria-haspopup="dialog"
                   >
-                    <CalendarDays className="shrink-0 text-slate-500" size={15} />
-                    <span className="min-w-0 flex-1 truncate">{overviewDateLabel(overviewDatePreset)}</span>
+                    <ListFilter size={15} />
+                    Фильтры
+                    <ChevronDown
+                      className={cn('text-slate-500 transition-transform', overviewFiltersMenuOpen && 'rotate-180')}
+                      size={15}
+                    />
                   </button>
-                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
 
-                  {overviewDateMenuOpen ? (
-                    <div className="absolute left-0 top-10 z-30 w-[310px] rounded-md border border-slate-200 bg-white p-2 text-sm text-slate-700 shadow-xl">
-                      <div className="grid gap-1">
-                        {[
-                          ['all', 'Все даты'],
-                          ['latest-week', 'За неделю'],
-                          ['latest-month', 'За месяц'],
-                          ['latest-year', 'За год'],
-                        ].map(([value, label]) => (
+                  {overviewFiltersMenuOpen ? (
+                    <div
+                      className="absolute left-0 top-14 z-50 w-[340px] rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 shadow-xl"
+                      role="dialog"
+                      aria-label="Фильтры заявок"
+                    >
+                      <div className="mb-3 flex items-center justify-between">
+                        <div className="font-semibold text-slate-950">Фильтры</div>
+                        {overviewFiltersActive ? (
                           <button
-                            key={value}
                             type="button"
-                            onClick={() => {
-                              setOverviewDatePreset(value as OverviewDatePreset)
-                              setOverviewDateMenuOpen(false)
-                            }}
-                            className={cn(
-                              'flex h-8 items-center rounded-md px-2 text-left transition hover:bg-slate-50',
-                              overviewDatePreset === value && 'bg-emerald-50 text-emerald-800',
-                            )}
+                            onClick={resetOverviewFilters}
+                            className="text-xs font-medium text-emerald-700 hover:text-emerald-900"
                           >
-                            {label}
+                            Сбросить
                           </button>
-                        ))}
+                        ) : null}
                       </div>
 
-                      <div className="my-2 border-t border-slate-100" />
+                      <div className="grid gap-3">
+                        <label className="grid gap-1.5 text-xs font-medium text-slate-500">
+                          Статус
+                          <span className="relative">
+                            <select
+                              value={overviewStatusFilter}
+                              onChange={(event) => setOverviewStatusFilter(event.target.value as RequestStatus | typeof allOverviewFilter)}
+                              className={cn(overviewFilterControl, 'w-full appearance-none pr-8')}
+                            >
+                              <option value={allOverviewFilter}>Все статусы</option>
+                              {overviewStatusOptions.map((status) => (
+                                <option key={status} value={status}>
+                                  {status === 'sent' ? 'Ожидает' : requestStatusLabels[status]}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                          </span>
+                        </label>
 
-                      <div className="grid gap-2">
-                        <div className="text-xs font-medium text-slate-500">Свой период</div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <label className="grid gap-1 text-[11px] text-slate-500">
-                            c
-                            <input
-                              type="date"
-                              value={overviewCustomStartValue}
-                              onInput={(event) => {
-                                setOverviewCustomStartDate(event.currentTarget.value)
-                                setOverviewDatePreset('custom')
-                              }}
-                              onChange={(event) => {
-                                setOverviewCustomStartDate(event.target.value)
-                                setOverviewDatePreset('custom')
-                              }}
-                              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-700/10"
-                            />
-                          </label>
-                          <label className="grid gap-1 text-[11px] text-slate-500">
-                            по
-                            <input
-                              type="date"
-                              value={overviewCustomEndValue}
-                              onInput={(event) => {
-                                setOverviewCustomEndDate(event.currentTarget.value)
-                                setOverviewDatePreset('custom')
-                              }}
-                              onChange={(event) => {
-                                setOverviewCustomEndDate(event.target.value)
-                                setOverviewDatePreset('custom')
-                              }}
-                              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-700/10"
-                            />
-                          </label>
+                        <label className="grid gap-1.5 text-xs font-medium text-slate-500">
+                          Кабинет
+                          <span className="relative">
+                            <select
+                              value={overviewRoomFilter}
+                              onChange={(event) => setOverviewRoomFilter(event.target.value)}
+                              className={cn(overviewFilterControl, 'w-full appearance-none pr-8')}
+                            >
+                              <option value={allOverviewFilter}>Все кабинеты</option>
+                              {overviewRoomOptions.map((room) => (
+                                <option key={room.id} value={room.id}>
+                                  {room.number} {room.title}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                          </span>
+                        </label>
+
+                        <div ref={overviewDateMenuRef} className="relative grid gap-1.5">
+                          <div className="text-xs font-medium text-slate-500">Дата</div>
+                          <button
+                            type="button"
+                            onClick={() => setOverviewDateMenuOpen((current) => !current)}
+                            className={cn(overviewFilterControl, 'flex w-full items-center gap-2 pr-8 text-left')}
+                            aria-expanded={overviewDateMenuOpen}
+                          >
+                            <CalendarDays className="shrink-0 text-slate-500" size={15} />
+                            <span className="min-w-0 flex-1 truncate">{overviewDateLabel(overviewDatePreset)}</span>
+                          </button>
+                          <ChevronDown className="pointer-events-none absolute bottom-4 right-3 translate-y-1/2 text-slate-400" size={15} />
+
+                          {overviewDateMenuOpen ? (
+                            <div className="absolute left-0 top-[74px] z-50 w-full rounded-md border border-slate-200 bg-white p-2 text-sm text-slate-700 shadow-xl">
+                              <div className="grid gap-1">
+                                {[
+                                  ['all', 'Все даты'],
+                                  ['latest-week', 'За неделю'],
+                                  ['latest-month', 'За месяц'],
+                                  ['latest-year', 'За год'],
+                                ].map(([value, label]) => (
+                                  <button
+                                    key={value}
+                                    type="button"
+                                    onClick={() => {
+                                      setOverviewDatePreset(value as OverviewDatePreset)
+                                      setOverviewDateMenuOpen(false)
+                                    }}
+                                    className={cn(
+                                      'flex h-8 items-center rounded-md px-2 text-left transition hover:bg-slate-50',
+                                      overviewDatePreset === value && 'bg-emerald-50 text-emerald-800',
+                                    )}
+                                  >
+                                    {label}
+                                  </button>
+                                ))}
+                              </div>
+
+                              <div className="my-2 border-t border-slate-100" />
+
+                              <div className="grid gap-2">
+                                <div className="text-xs font-medium text-slate-500">Свой период</div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <label className="grid gap-1 text-[11px] text-slate-500">
+                                    c
+                                    <input
+                                      type="date"
+                                      value={overviewCustomStartValue}
+                                      onInput={(event) => {
+                                        setOverviewCustomStartDate(event.currentTarget.value)
+                                        setOverviewDatePreset('custom')
+                                      }}
+                                      onChange={(event) => {
+                                        setOverviewCustomStartDate(event.target.value)
+                                        setOverviewDatePreset('custom')
+                                      }}
+                                      className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-700/10"
+                                    />
+                                  </label>
+                                  <label className="grid gap-1 text-[11px] text-slate-500">
+                                    по
+                                    <input
+                                      type="date"
+                                      value={overviewCustomEndValue}
+                                      onInput={(event) => {
+                                        setOverviewCustomEndDate(event.currentTarget.value)
+                                        setOverviewDatePreset('custom')
+                                      }}
+                                      onChange={(event) => {
+                                        setOverviewCustomEndDate(event.target.value)
+                                        setOverviewDatePreset('custom')
+                                      }}
+                                      className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-700/10"
+                                    />
+                                  </label>
+                                </div>
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     </div>
                   ) : null}
                 </div>
-
-                <button
-                  type="button"
-                  onClick={resetOverviewFilters}
-                  className={cn(
-                    'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border px-3 text-sm font-normal transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/15',
-                    overviewFiltersActive
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950',
-                  )}
-                  title={overviewFiltersActive ? 'Сбросить фильтры' : 'Фильтры'}
-                >
-                  <ListFilter size={15} />
-                  Фильтры
-                </button>
               </div>
             ) : null}
 
             {!isRequestOverview ? (
-              <div className="mt-4 grid items-start gap-3 min-[1500px]:grid-cols-[260px_minmax(0,1fr)]">
-                <div className="app-soft-card grid grid-cols-2 content-start gap-2 rounded-md border p-2 min-[1500px]:grid-cols-1">
-                  <select
-                    value={selectedCategory}
-                    onChange={(event) => setSelectedCategory(event.target.value)}
-                    className={cn(fieldStyles, 'h-10 px-3 py-2 text-sm')}
-                  >
-                    {categories.map((category) => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
-                    ))}
-                  </select>
-
-                  <label className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-                    <input
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      className={cn(fieldStyles, 'h-10 px-3 py-2 pl-9 text-sm')}
-                      placeholder={isRequestsMode ? 'Поиск в заявке' : 'Поиск материала'}
-                    />
-                  </label>
+              isRequestsMode ? (
+                <div className="mt-1.5">
+                  {renderRequestContext()}
                 </div>
+              ) : (
+                <div className="mt-4 grid items-start gap-3 min-[1500px]:grid-cols-[260px_minmax(0,1fr)]">
+                  <div className="app-soft-card grid grid-cols-2 content-start gap-2 rounded-md border p-2 min-[1500px]:grid-cols-1">
+                    <select
+                      value={selectedCategory}
+                      onChange={(event) => setSelectedCategory(event.target.value)}
+                      className={cn(fieldStyles, 'h-10 px-3 py-2 text-sm')}
+                    >
+                      {categories.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
 
-                {isRequestsMode ? renderRequestContext() : <div />}
-              </div>
+                    <label className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                      <input
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        className={cn(fieldStyles, 'h-10 px-3 py-2 pl-9 text-sm')}
+                        placeholder="Поиск материала"
+                      />
+                    </label>
+                  </div>
+
+                  <div />
+                </div>
+              )
             ) : null}
           </motion.div>
 
@@ -1354,20 +1522,26 @@ export function SeniorWorkspacePage() {
                   className="absolute inset-0 flex min-h-0 flex-col"
                 >
           <div className="app-section-band flex min-h-0 flex-1 flex-col p-3">
-            <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-              <div className="h-full overflow-y-auto overflow-x-hidden">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
+              <div
+                data-testid="request-lines-scroll"
+                className={cn(
+                  'min-h-0 flex-1 overflow-x-hidden',
+                  isRequestsMode
+                    ? 'overflow-y-scroll [scrollbar-gutter:stable]'
+                    : 'overflow-y-auto',
+                )}
+              >
             <table className="w-full table-fixed border-separate border-spacing-0">
               <colgroup>
                 <col className="w-[3%]" />
-                <col className="w-[34%]" />
-                <col className="w-[8%]" />
-                <col className="w-[4%]" />
-                <col className="w-[7%]" />
-                <col className="w-[6%]" />
+                <col />
                 <col className="w-[8%]" />
                 <col className="w-[5%]" />
-                <col className="w-[7%]" />
-                <col className="w-[18%]" />
+                <col className="w-[8%]" />
+                <col className="w-[8%]" />
+                <col className="w-[10%]" />
+                <col className="w-[194px]" />
               </colgroup>
               <thead>
                 <tr>
@@ -1377,10 +1551,8 @@ export function SeniorWorkspacePage() {
                   <th className={detailHeaderCell}>Ед.</th>
                   <th className={detailHeaderCell}>В заявке</th>
                   <th className={detailHeaderCell}>Остаток</th>
-                  <th className={detailHeaderCell}>После выдачи</th>
-                  <th className={detailHeaderCell}>Мин.</th>
                   <th className={detailHeaderCell}>Статус</th>
-                  <th className={cn(detailHeaderCell, '!px-1')}>Действия</th>
+                  <th className={cn(detailHeaderCell, '!px-1')}>К выдаче</th>
                 </tr>
               </thead>
               <tbody>
@@ -1388,12 +1560,20 @@ export function SeniorWorkspacePage() {
                   const requestLine = requestLineByItem.get(item.id)
                   const available = getStockQuantity(stock, item.id)
                   const remaining = requestLine ? requestLine.quantity - requestLine.issuedQuantity : 0
-                  const afterIssue = requestLine ? available - remaining : available
                   const shortage = requestLine ? Math.max(remaining - available, 0) : 0
                   const stockStatus = getStockStatus(item, stock, replenishment)
                   const issueDraft = requestLine ? issueDrafts[requestLine.id] : undefined
-                  const partialQuantity = issueDraft?.mode === 'partial' ? issueDraft.quantity : ''
-                  const hasPartialQuantity = Math.round(Number(partialQuantity) || 0) > 0
+                  const issueQuantityValue =
+                    issueDraft?.mode === 'full'
+                      ? String(remaining)
+                      : issueDraft?.mode === 'partial'
+                        ? issueDraft.quantity
+                        : ''
+                  const issueQuantity = Math.round(Number(issueQuantityValue) || 0)
+                  const hasIssueQuantity = issueQuantity > 0
+                  const maxIssueQuantity = Math.min(available, remaining)
+                  const isIssueQuantityInvalid = issueQuantity < 0 || issueQuantity > maxIssueQuantity
+                  const projectedAfterIssue = available - issueQuantity
                   const active = selectedItem?.id === item.id
                   const isIssued = requestLine?.status === 'issued'
                   const isPartiallyIssued = requestLine?.status === 'partially-issued'
@@ -1403,12 +1583,13 @@ export function SeniorWorkspacePage() {
                       (requestLine.status === 'not-enough' ||
                         requestLine.status === 'waiting-replenishment'),
                   )
+                  const canSendToReplenishment = isOutOfStockRequestLine || shortage > 0
                   const rowTone =
                     isOutOfStockRequestLine
                       ? 'bg-rose-100/80 hover:!bg-rose-100/90'
                       : issueDraft?.mode === 'full'
                       ? 'bg-emerald-50/80 hover:!bg-emerald-50'
-                      : issueDraft?.mode === 'partial' && hasPartialQuantity
+                      : issueDraft?.mode === 'partial' && hasIssueQuantity
                         ? 'bg-amber-50/80 hover:!bg-amber-50'
                         : isIssued
                           ? 'bg-emerald-50/80 hover:!bg-emerald-50'
@@ -1426,13 +1607,13 @@ export function SeniorWorkspacePage() {
                     <tr
                       key={item.id}
                       onClick={() => setSelectedItemId(item.id)}
-                      className={cn('cursor-pointer transition hover:bg-slate-100/70', rowTone)}
+                      className={cn('h-[43px] cursor-pointer transition hover:bg-slate-100/70', rowTone)}
                     >
                       <td className={cn(detailTableCell, '!px-1 text-center text-xs text-slate-500')}>
                         {index + 1}
                       </td>
                       <td className={cn(detailTableCell, 'min-w-0')}>
-                        <div className="whitespace-normal break-words leading-5 text-slate-950" title={item.fullName}>
+                        <div className="line-clamp-2 whitespace-normal break-words leading-[18px] text-slate-950" title={item.fullName}>
                           {item.fullName}
                         </div>
                       </td>
@@ -1452,21 +1633,6 @@ export function SeniorWorkspacePage() {
                       <td className={cn(detailTableCell, 'whitespace-nowrap text-center', available < item.minStock ? 'text-rose-700' : 'text-slate-700')}>
                         <div className={cn(available < item.minStock ? 'text-rose-700' : 'text-slate-950')}>{formatNumber(available)}</div>
                       </td>
-                      <td className={cn(detailTableCell, 'whitespace-nowrap text-center')}>
-                        {requestLine ? (
-                          <div>
-                            <div className={cn(shortage > 0 ? 'text-rose-700' : afterIssue < item.minStock ? 'text-amber-700' : 'text-slate-950')}>
-                              {formatNumber(afterIssue)}
-                            </div>
-                            <div className={cn('text-xs', shortage > 0 ? 'text-rose-600' : afterIssue < item.minStock ? 'text-amber-700' : 'hidden')}>
-                              {shortage > 0 ? `не хватает ${formatNumber(shortage)}` : afterIssue < item.minStock ? 'ниже мин.' : 'норма'}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-slate-950">{formatNumber(available)}</span>
-                        )}
-                      </td>
-                      <td className={cn(detailTableCell, 'text-center')}>{formatNumber(item.minStock)}</td>
                       <td className={detailTableCell}>
                         <div className="flex justify-center">
                           <StatusPill className="whitespace-nowrap !font-normal" tone={statusTone(requestLine?.status ?? stockStatus)}>
@@ -1474,64 +1640,72 @@ export function SeniorWorkspacePage() {
                           </StatusPill>
                         </div>
                       </td>
-                      <td className={cn(detailTableCell, '!px-1 whitespace-nowrap')} onClick={(event) => event.stopPropagation()}>
+                      <td className={cn(detailTableCell, '!px-1.5')} onClick={(event) => event.stopPropagation()}>
                         {requestLine && selectedRequest ? (
-                          <div className="flex w-full min-w-0 flex-wrap items-center justify-center gap-1">
-                            {isOutOfStockRequestLine ? (
-                              <ToolIconButton
-                                label={isLineInReplenishment ? 'В пополнении' : 'Нет на складе / В пополнение'}
-                                icon={<PackageX size={13} strokeWidth={2.2} />}
-                                tone={isLineInReplenishment ? 'info' : 'danger'}
-                                className="!min-h-5 !px-1.5 py-0 text-[10px]"
-                                onClick={isLineInReplenishment ? undefined : () => markLineOutOfStock(selectedRequest.id, requestLine.id)}
-                              />
-                            ) : (
-                              <>
-                                <ToolIconButton
-                                  label={issueDraft?.mode === 'full' ? 'Отмена' : 'Выдать'}
-                                  icon={issueDraft?.mode === 'full' ? undefined : <Check size={13} strokeWidth={2.2} />}
-                                  tone={issueDraft?.mode === 'full' ? 'neutral' : 'success'}
-                                  className={cn('!min-h-5 !px-1.5 py-0 text-[10px]', issueDraft?.mode === 'full' && 'border-slate-300 bg-white text-slate-700')}
-                                  disabled={remaining <= 0 || available < remaining}
-                                  onClick={() => stageFullIssue(requestLine.id)}
-                                />
-                                <div className="inline-flex items-center gap-1">
-                                  <ToolIconButton
-                                    label={issueDraft?.mode === 'partial' ? 'Отмена' : 'Выдать часть'}
-                                    className={cn('!min-h-5 !px-1.5 py-0 text-[10px]', issueDraft?.mode === 'partial' && 'border-slate-300 bg-white text-slate-700')}
-                                    disabled={remaining <= 0 || available <= 0}
-                                    onClick={() => openPartialIssue(requestLine.id)}
-                                  />
-                                  {issueDraft?.mode === 'partial' ? (
-                                    <input
-                                      type="number"
-                                      min={1}
-                                      max={Math.min(available, remaining)}
-                                      value={partialQuantity}
-                                      onInput={(event) => updatePartialIssue(requestLine.id, event.currentTarget.value)}
-                                      onChange={(event) => updatePartialIssue(requestLine.id, event.target.value)}
-                                      onKeyDown={(event) => {
-                                        if (event.key === 'Enter') {
-                                          updatePartialIssue(requestLine.id, event.currentTarget.value)
-                                          event.currentTarget.blur()
-                                        }
-                                      }}
-                                      className="h-5 w-10 rounded-md border border-amber-300 bg-white px-1 text-center text-[11px] text-slate-900 outline-none focus:border-amber-500"
-                                      aria-label="Количество для частичной выдачи"
-                                    />
-                                  ) : null}
-                                </div>
-                                {shortage > 0 ? (
-                                  <ToolIconButton
-                                    label="Не хватает / В пополнение"
-                                    icon={<PackageX size={13} strokeWidth={2.2} />}
-                                    tone="danger"
-                                    className="!min-h-5 !px-1.5 py-0 text-[10px]"
-                                    onClick={() => markLineOutOfStock(selectedRequest.id, requestLine.id)}
-                                  />
-                                ) : null}
-                              </>
-                            )}
+                          <div className="flex w-full min-w-0 items-stretch gap-1.5">
+                            <input
+                              type="number"
+                              min={0}
+                              max={maxIssueQuantity}
+                              step={1}
+                              value={issueQuantityValue}
+                              placeholder={remaining <= 0 ? '—' : undefined}
+                              disabled={remaining <= 0 || available <= 0}
+                              onInput={(event) =>
+                                updateIssueQuantity(requestLine.id, event.currentTarget.value, remaining, available)
+                              }
+                              onChange={(event) =>
+                                updateIssueQuantity(requestLine.id, event.target.value, remaining, available)
+                              }
+                              className={cn(
+                                'h-9 w-[84px] shrink-0 appearance-none rounded-md border bg-white px-2 text-center !text-base font-semibold text-slate-950 outline-none transition [appearance:textfield] focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
+                                isIssueQuantityInvalid
+                                  ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/10'
+                                  : 'border-slate-300 focus:border-emerald-600 focus:ring-emerald-700/10',
+                              )}
+                              aria-label={`Количество к выдаче: ${item.fullName}`}
+                            />
+                            <div className="flex h-9 w-[92px] shrink-0 items-center justify-between gap-1 rounded-md border border-slate-200 bg-white/70 px-1.5">
+                              <div className="grid min-w-0 grid-cols-[auto_1fr] items-center gap-x-1 text-[12px] leading-[15px]">
+                                <span className="font-medium text-slate-600">После</span>
+                                <span
+                                  className={cn(
+                                    'text-right text-[13px] font-semibold',
+                                    projectedAfterIssue < 0
+                                      ? 'text-rose-700'
+                                      : projectedAfterIssue < item.minStock
+                                        ? 'text-amber-700'
+                                        : 'text-slate-700',
+                                  )}
+                                >
+                                  {formatNumber(projectedAfterIssue)}
+                                </span>
+                                <span className="font-medium text-slate-600">Мин.</span>
+                                <span className="text-right text-[13px] font-semibold text-slate-700">
+                                  {formatNumber(item.minStock)}
+                                </span>
+                              </div>
+                              {canSendToReplenishment ? (
+                                <button
+                                  type="button"
+                                  className={cn(
+                                    'flex size-6 shrink-0 items-center justify-center rounded border transition',
+                                    isLineInReplenishment
+                                      ? 'cursor-default border-sky-200 bg-sky-50 text-sky-700'
+                                      : 'border-rose-200 bg-rose-50 text-rose-700 hover:border-rose-300 hover:bg-rose-100',
+                                  )}
+                                  onClick={
+                                    isLineInReplenishment
+                                      ? undefined
+                                      : () => markLineOutOfStock(selectedRequest.id, requestLine.id)
+                                  }
+                                  aria-label={isLineInReplenishment ? 'В пополнении' : 'Добавить в пополнение'}
+                                  title={isLineInReplenishment ? 'В пополнении' : 'Добавить в пополнение'}
+                                >
+                                  <PackageX size={14} strokeWidth={2.2} />
+                                </button>
+                              ) : null}
+                            </div>
                           </div>
                         ) : (
                           <div className="grid w-full min-w-0 grid-cols-1 gap-1.5">
@@ -1547,7 +1721,7 @@ export function SeniorWorkspacePage() {
                   <tr
                     key={line.id}
                     className={cn(
-                      'transition hover:bg-amber-50/70',
+                      'h-[43px] transition hover:bg-amber-50/70',
                       index % 2 ? 'bg-white' : 'bg-amber-50/35',
                     )}
                   >
@@ -1555,10 +1729,10 @@ export function SeniorWorkspacePage() {
                       {visibleCatalog.length + index + 1}
                     </td>
                     <td className={cn(detailTableCell, 'min-w-0')}>
-                      <div className="whitespace-normal break-words leading-5 text-slate-950" title={line.manualName}>
+                      <div className="line-clamp-2 whitespace-normal break-words leading-[18px] text-slate-950" title={line.manualName}>
                         {line.manualName}
                       </div>
-                      {line.seniorComment ? <div className="mt-1 text-xs text-slate-500">{line.seniorComment}</div> : null}
+                      {line.seniorComment ? <div className="line-clamp-1 text-xs text-slate-500">{line.seniorComment}</div> : null}
                     </td>
                     <td className={detailTableCell}>{manualCategory}</td>
                     <td className={cn(detailTableCell, 'text-center')}>шт.</td>
@@ -1566,11 +1740,6 @@ export function SeniorWorkspacePage() {
                       <div className="whitespace-nowrap text-slate-950">
                         {formatNumber(line.quantity)}
                       </div>
-                    </td>
-                    <td className={cn(detailTableCell, 'text-center')}>—</td>
-                    <td className={cn(detailTableCell, 'text-center')}>
-                      <div className="text-amber-700">сверить</div>
-                      <div className="text-xs text-slate-500">нет в справочнике</div>
                     </td>
                     <td className={cn(detailTableCell, 'text-center')}>—</td>
                     <td className={detailTableCell}>
@@ -1581,10 +1750,33 @@ export function SeniorWorkspacePage() {
                       </div>
                     </td>
                     <td className={detailTableCell} onClick={(event) => event.stopPropagation()}>
-                      <span className="block text-center text-xs text-slate-400">—</span>
+                      <span className="block text-center text-xs text-amber-700">сверить · нет в справочнике</span>
                     </td>
                   </tr>
                 ))}
+                {isRequestsMode
+                  ? Array.from({
+                      length: Math.max(
+                        requestTableVisibleRowCount - visibleCatalog.length - visibleManualLines.length,
+                        0,
+                      ),
+                    }).map((_, rowIndex) => (
+                      <tr
+                        key={`request-table-empty-row-${rowIndex}`}
+                        className="h-[43px] bg-white"
+                        aria-hidden="true"
+                      >
+                        {Array.from({ length: requestTableColumnCount }).map((__, columnIndex) => (
+                          <td
+                            key={columnIndex}
+                            className={cn(detailTableCell, columnIndex === requestTableColumnCount - 1 && 'border-r-0')}
+                          >
+                            &nbsp;
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  : null}
               </tbody>
             </table>
 
@@ -1592,18 +1784,42 @@ export function SeniorWorkspacePage() {
               <EmptyState className="m-3">По текущему фильтру материалов нет.</EmptyState>
             ) : null}
               </div>
-            </div>
-
-            <div className="app-soft-card mt-2 flex shrink-0 flex-wrap items-center justify-end gap-3 rounded-md border px-3 py-2">
-              <div className="text-right text-xs text-slate-500">
-                {validIssueDrafts.length
-                  ? `К выдаче: ${fullIssueDraftCount}; частично: ${partialIssueDraftCount}`
-                  : 'Выберите строки для выдачи'}
-              </div>
-              <Button variant="primary" disabled={!validIssueDrafts.length || issueConfirmationStatus === 'loading'} onClick={confirmIssueDrafts}>
-                <PackageCheck size={16} />
-                Подтвердить и выдать
-              </Button>
+              {isRequestsMode && selectedRequest ? (
+                <>
+                  <section
+                    data-testid="request-comment"
+                    className="mt-2 min-h-[96px] shrink-0 border-t border-slate-200 bg-slate-50/65 px-5 py-4"
+                    aria-labelledby="request-comment-title"
+                  >
+                    <div
+                      id="request-comment-title"
+                      className="text-[11px] font-semibold uppercase tracking-wide text-slate-500"
+                    >
+                      Комментарий к заявке
+                    </div>
+                    <div className="mt-2 max-w-5xl whitespace-normal break-words text-sm leading-5 text-slate-700">
+                      {selectedRequest.comment || 'Комментарий не указан'}
+                    </div>
+                  </section>
+                  <div className="flex min-h-[58px] shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-slate-50/80 px-3 py-2">
+                    <Button
+                      className="h-9 border-[#8db9ab] px-3 font-semibold text-emerald-800 hover:border-[#6aa28f] hover:bg-white"
+                      variant="secondary"
+                      onClick={prepareAvailableIssue}
+                    >
+                      Подготовить доступное
+                    </Button>
+                    <Button
+                      variant="primary"
+                      disabled={!validIssueDrafts.length || issueConfirmationStatus === 'loading'}
+                      onClick={() => setIssueConfirmationOpen(true)}
+                    >
+                      <PackageCheck size={16} />
+                      Подтвердить и выдать
+                    </Button>
+                  </div>
+                </>
+              ) : null}
             </div>
           </div>
                 </motion.div>
@@ -1612,6 +1828,76 @@ export function SeniorWorkspacePage() {
           </div>
         </motion.section>
       </section>
+
+      {issueConfirmationOpen ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/5 px-4 py-6 [backdrop-filter:blur(0.5px)]"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIssueConfirmationOpen(false)
+          }}
+        >
+          <div
+            className="app-panel w-full max-w-md rounded-xl border p-6 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="issue-confirmation-title"
+          >
+            <div id="issue-confirmation-title" className="text-xl font-semibold text-slate-950">
+              Подтвердить выдачу
+            </div>
+            <div className="mt-2 text-sm leading-6 text-slate-600">
+              После подтверждения материалы будут списаны со склада.
+            </div>
+            <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Заявка</div>
+              <div className="mt-1 text-sm font-medium text-slate-950">{requestTitle(selectedRequest)}</div>
+              <div className="mt-2 text-sm text-slate-700">
+                К выдаче выбрано позиций:{' '}
+                <span className="font-semibold text-slate-950">{validIssueDrafts.length}</span>
+              </div>
+            </div>
+            {issueCriticalMoments.length ? (
+              <div className="mt-3 rounded-md border border-amber-200 bg-amber-50/70 px-4 py-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+                  Обратите внимание
+                </div>
+                <div className="mt-2 grid gap-2">
+                  {issueCriticalMoments.map((moment) => (
+                    <div
+                      key={moment.text}
+                      className={cn(
+                        'flex items-start gap-2 text-sm leading-5',
+                        moment.tone === 'danger' ? 'text-rose-800' : 'text-amber-900',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'mt-[7px] size-1.5 shrink-0 rounded-full',
+                          moment.tone === 'danger' ? 'bg-rose-600' : 'bg-amber-600',
+                        )}
+                      />
+                      <span>{moment.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setIssueConfirmationOpen(false)}>
+                Отмена
+              </Button>
+              <Button
+                onClick={() => {
+                  setIssueConfirmationOpen(false)
+                  confirmIssueDrafts()
+                }}
+              >
+                Подтвердить
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {issueConfirmationStatus === 'loading' ? (
         <BrandedLoadingModal title="Проводим выдачу материалов" />
