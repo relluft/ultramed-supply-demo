@@ -202,6 +202,18 @@
   white-space: nowrap;
 }
 
+[data-ui-mode="workspace-v2"] .nurse-settings-reset {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 0;
+}
+
+[data-ui-mode="workspace-v2"] .nurse-settings-reset .workspace-button {
+  white-space: nowrap;
+}
+
 [data-ui-mode="workspace-v2"] .nurse-settings-sound-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -296,7 +308,8 @@ html[data-nurse-motion="reduced"] [data-ui-mode="workspace-v2"] *::after {
   [data-ui-mode="workspace-v2"] .nurse-settings-container { padding: 20px 16px 28px; }
   [data-ui-mode="workspace-v2"] .nurse-settings-page__header { align-items: flex-start; flex-direction: column; gap: 13px; }
   [data-ui-mode="workspace-v2"] .nurse-settings-density,
-  [data-ui-mode="workspace-v2"] .nurse-settings-sound-row { grid-template-columns: minmax(0, 1fr); }
+  [data-ui-mode="workspace-v2"] .nurse-settings-sound-row,
+  [data-ui-mode="workspace-v2"] .nurse-settings-reset { grid-template-columns: minmax(0, 1fr); }
   [data-ui-mode="workspace-v2"] .nurse-settings-sound-row .nurse-settings-row { padding-right: 0; }
   [data-ui-mode="workspace-v2"] .nurse-settings-sound-test { width: 100%; margin-bottom: 16px; }
   [data-ui-mode="workspace-v2"] .nurse-settings-aside { grid-template-columns: minmax(0, 1fr); }

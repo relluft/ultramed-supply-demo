@@ -6,6 +6,7 @@ export interface Room {
   title: string
   type: string
   nurseNames: string[]
+  responsibleName?: string
 }
 
 export interface Supplier {

@@ -30,7 +30,7 @@ export function RoleSwitcher({
     }
 
     setRole(nextRole)
-    navigate(nextRole === 'senior-nurse' ? '/senior' : nextRole === 'manager' ? '/analytics' : '/cabinet')
+    navigate(nextRole === 'senior-nurse' ? '/senior' : nextRole === 'manager' ? '/manager' : '/cabinet')
   }
 
   return (

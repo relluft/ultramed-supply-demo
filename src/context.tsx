@@ -119,6 +119,9 @@ function roleForCurrentRoute(fallback: DemoRole): DemoRole {
 
   const { pathname } = window.location
 
+  if (pathname === '/rooms' || pathname === '/settings') {
+    return fallback === 'manager' || fallback === 'senior-nurse' ? fallback : 'senior-nurse'
+  }
   if (seniorRoutePaths.has(pathname)) return 'senior-nurse'
   if (pathname === '/analytics') return 'manager'
   if (pathname === '/cabinet' || pathname.startsWith('/cabinet/')) {
@@ -741,6 +744,7 @@ interface DemoContextValue {
   startDemo: (role?: DemoRole) => void
   resetDemo: () => void
   setRole: (role: DemoRole) => void
+  assignRoomResponsible: (roomId: string, responsibleName: string) => void
   loadRequestDraft: (requestId: string) => void
   addCatalogToCart: (itemId: string, quantity: number) => void
   addManualLineToCart: (manualName: string, quantity: number, comment?: string) => void
@@ -808,6 +812,23 @@ export function DemoProvider({ children }: PropsWithChildren) {
 
   const setRole = useCallback((role: DemoRole) => {
     setState((current) => ({ ...current, role, uiMessage: undefined }))
+  }, [])
+
+  const assignRoomResponsible = useCallback((roomId: string, responsibleName: string) => {
+    setState((current) => {
+      if (current.role !== 'senior-nurse') return current
+
+      const room = current.rooms.find((item) => item.id === roomId)
+      if (!room || !room.nurseNames.includes(responsibleName)) return current
+
+      const next = clone(current)
+      const nextRoom = next.rooms.find((item) => item.id === roomId)
+      if (!nextRoom) return current
+
+      nextRoom.responsibleName = responsibleName
+      next.uiMessage = `Ответственный по кабинету ${nextRoom.number} назначен`
+      return next
+    })
   }, [])
 
   const removeCabinetMaterialBatch = useCallback((batchId: string) => {
@@ -1563,6 +1584,7 @@ export function DemoProvider({ children }: PropsWithChildren) {
       startDemo,
       resetDemo,
       setRole,
+      assignRoomResponsible,
       loadRequestDraft,
       addCatalogToCart,
       addManualLineToCart,
@@ -1595,6 +1617,7 @@ export function DemoProvider({ children }: PropsWithChildren) {
       startDemo,
       resetDemo,
       setRole,
+      assignRoomResponsible,
       loadRequestDraft,
       addCatalogToCart,
       addManualLineToCart,

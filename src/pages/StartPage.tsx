@@ -65,7 +65,7 @@ const loginProfiles: Record<
     caption: 'Аналитика, журнал и контроль снабжения',
     login: 'director@ultramed.local',
     password: 'demo-director',
-    route: '/analytics',
+    route: '/manager',
     icon: BriefcaseBusiness,
   },
 }
